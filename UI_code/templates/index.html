@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='toggle.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='slider.css') }}">
+    <title>VaneX</title>
+</head>
+<body>
+
+    <div class="column-wrapper">
+        <!-- 第一列 -->
+        <div class="column">
+            <div class="card" style="height:100px">
+                <h3><i class="fa fa-terminal"></i>&nbsp;&nbsp;Cmd</h3>
+                <button onclick="openCmd()">Open Cmd</button>
+            </div>
+            <div class="card">
+                <h3><i class="fa fa-skull"></i>&nbsp;&nbsp;Process Killer</h3>
+                <div>
+                    <input type="text" id="processInput" placeholder="Enter process ID or name">
+                    <button onclick="killProcess()">Kill!</button>
+                </div>
+                <p id="killResult" style="color:#272727;margin-left: 21px;">Ready...</p>
+            </div>
+        </div>
+        <!-- 第二列 -->
+        <div class="column">
+            <div class="card" style="height:160px">
+                <h3><i class="fas fa-keyboard"></i>&nbsp;&nbsp;Keystrokes</h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="keyToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <h3 style="color: #aa1313;font-size: 0.9rem;">There might be some lag when starting up</h3>
+            </div>
+
+            <div class="card" style="height:260px">
+                <h3><i class="fas fa-wifi"></i>&nbsp;&nbsp;Radar</h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="rader" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div style="margin-top:0px;">
+                    <h3><label for="radarInterval">Scan interval: <span id="intervalValue">20</span>s</label></h3>
+                    <input class="custom-slider" type="range" id="radarInterval" min="5" max="60" value="20" style="margin-top:-20px;" />
+                </div>
+                <div style="margin-top:0px;">
+                    <h3><label for="radarSize">Window size: <span id="sizeValue">250</span>px</label></h3>
+                    <input class="custom-slider" type="range" id="radarSize" min="150" max="800" value="250" style="margin-top:-20px;" />
+                </div>
+            </div>
+        </div>
+        <!-- 第三列 -->
+        <div class="column">
+        </div>
+        <!-- 第四列 -->
+        <div class="column">
+        </div>
+        <!-- 第五列 -->
+        <div class="column">
+        </div>
+        <!-- 第六列 -->
+        <div class="column">
+        </div>
+    </div>
+
+    <script>
+        // ===== CMD =====
+        function openCmd() {
+            fetch('/open_cmd')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('message').textContent = data;
+                    setTimeout(() => {
+                        document.getElementById('message').textContent = '';
+                    }, 3000);  // 3秒后自动消失
+                })
+                .catch(error => {
+                    document.getElementById('message').textContent = 'error';
+                    document.getElementById('message').style.color = 'red';
+                });
+        }
+
+        // ===== Process Killer =====
+        function killProcess() {
+            const input = document.getElementById('processInput').value.trim();
+            const resultElement = document.getElementById('killResult');
+
+            if (!input) {
+                resultElement.style.color = '#dc3545';
+                resultElement.textContent = 'Please enter process ID or name';
+                return;
+            }
+
+            resultElement.style.color = '#6c757d';
+            resultElement.textContent = 'Killing...';
+
+            fetch('/kill_process', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    process_input: input
+                })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        resultElement.style.color = '#28a745';
+                        resultElement.textContent = ' ' + data.message;
+                    } else {
+                        resultElement.style.color = '#dc3545';
+                        resultElement.textContent = ' ' + data.message;
+                    }
+                })
+                .catch(error => {
+                    resultElement.style.color = '#dc3545';
+                    resultElement.textContent = error;
+                });
+        }
+
+        // 回车键提交
+        document.addEventListener('DOMContentLoaded', function () {
+            const input = document.getElementById('processInput');
+            if (input) {
+                input.addEventListener('keypress', function (e) {
+                    if (e.key === 'Enter') {
+                        killProcess();
+                    }
+                });
+            }
+        });
+
+        document.getElementById('keyToggle').addEventListener('change', function () {
+            if (this.checked) {
+                fetch('/keyToggle_enable');
+            } else {
+                fetch('/keyToggle_disable');
+            }
+        });
+
+        // Radar control
+        const radarToggle = document.getElementById('rader');
+        const radarInterval = document.getElementById('radarInterval');
+        const intervalValue = document.getElementById('intervalValue');
+        const radarSize = document.getElementById('radarSize');
+        const sizeValue = document.getElementById('sizeValue');
+
+        radarToggle.addEventListener('change', function () {
+            if (this.checked) {
+                fetch('/radar_enable');
+            } else {
+                fetch('/radar_disable');
+            }
+        });
+
+        radarInterval.addEventListener('input', function () {
+            intervalValue.textContent = this.value;
+            // 同步滑块背景进度
+            const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
+            this.style.backgroundSize = percent + '% 100%';
+        });
+
+        radarInterval.addEventListener('change', function () {
+            fetch('/radar_set_interval', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ interval: parseInt(this.value) })
+            });
+        });
+
+        radarSize.addEventListener('input', function () {
+            sizeValue.textContent = this.value;
+            // 同步滑块背景进度
+            const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
+            this.style.backgroundSize = percent + '% 100%';
+        });
+
+        radarSize.addEventListener('change', function () {
+            const size = parseInt(this.value);
+            // 将宽高都设置为同一值
+            fetch('/radar_set_size', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ width: size, height: size })
+            });
+        });
+
+        // 初始化滑块背景
+        document.querySelectorAll('.custom-slider').forEach(slider => {
+            const percent = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
+            slider.style.backgroundSize = percent + '% 100%';
+        });
+    </script>
+</body>
+</html>
