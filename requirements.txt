@@ -2,3 +2,4 @@
 Flask
 PyQt5
 pynput
+psutil

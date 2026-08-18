@@ -2,11 +2,19 @@
 
 
 a = Analysis(
-    ['UI_code/UI.py'],
-    pathex=[],
+    ['UI.py'],
+    pathex=[''],
     binaries=[],
-    datas=[('UI_code/static', 'static'),('UI_code/templates/index.html', 'templates/index.html')],
-    hiddenimports=[],
+    datas=[
+    ('web/', 'web/'),
+    ('windows_info', 'windows_info/')
+    ],
+    hiddenimports=[
+    ('keyinfo.key_display'),
+    ('Radar.radar_display'),
+    ('Status_info.Status_Display'),
+    ('windows_info.windows_Display')
+    ],
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],

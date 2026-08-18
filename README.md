@@ -1,27 +1,46 @@
-项目描述：
+**项目描述：**<br>
 一个基于 Flask 和 PyQt5 的桌面辅助工具集，通过 Web 界面统一管理多个可视化组件。提供键盘状态悬浮显示、雷达扫描窗口以及系统进程管理功能，适用于桌面美化、快捷操作等场景。
 
-项目结构：
-Vanex_recode/<br>
-├── UI_code/                                          # UI相关代码存放文件夹<br>
-│   ├── keyinfo                                      # 存放按键显示相关信息的文件夹<br>
-│	          └── key_display.py                    # 按键显示相关代码<br>
-│   ├── Radar                                         #存放雷达显示相关信息的文件夹<br>
-│          └──radar_display.py                   # 雷达显示相关代码<br>
-│   ├── templates                                   # 存放html文档的文件夹<br>
-│          └──index.html                            # web主页<br>
-│   ├── static                                          # 存放静态文件的文件夹<br>
-│          ├── slider.css                             # 滑块样式<br>
-│          ├── style.css                              # 主样式<br>
-│          └──toggle.css                            # 拨片开关样式<br>
-│   └── UI.py                                          # 主要的UI逻辑文件<br>
-├── main.py                                            # 程序入口（目前版本为空文件，若以后增加其他功能，则可能被作为主入口）<br>
-├── LICENSE                                           # 许可证文件<br>
-├── README.md                                    # 项目介绍<br>
-└── requirements.txt                              # 所需库<br>
+**项目结构：**<br>
+项目根目录/<br>
+├── keyinfo/<br>
+│ └── key_display.py<br>#按键显示
+│<br>
+├── Radar/<br>
+│ └── radar_display.py<br>#雷达显示
+│<br>
+├── Status_info/<br>
+│ └── Status_Display.py<br>#系统信息显示
+│<br>
+├── web/<br>#前端
+│ ├── index.html<br>
+│ ├── slider.css<br>
+│ ├── style.css<br>
+│ └── toggle.css<br>
+│<br>
+├── windows_info/<br>
+│ ├── admin.png<br>
+│ ├── system.png<br>
+│ ├── user.png<br>
+│ └── windowsinfo.py<br>#窗口信息显示
+│<br>
+├── UI.py<br>#主程序入口
+├── README.md<br>#瑞德米
+├── requirements.txt<br>#依赖库列表
+└── vanex.spec<br>#
+> **说明**：项目中包含的 `__pycache__` 目录为 Python 自动生成的字节码缓存，已在上述结构图中省略。
 
-**安装所需依赖库：**
+<font color="red">确保您已安装 Python 3.x 环境。建议使用虚拟环境来管理依赖。</font>
+
+**在项目根目录下执行以下命令安装所需库：**
+```bash
 pip install -r requirements.txt
-
+```
 **打包项目：**
+```bash
 pyinstaller vanex.spec
+```
+**运行项目：**
+```bash
+python UI.py
+```
