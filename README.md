@@ -24,10 +24,10 @@
 │ ├── user.png<br>
 │ └── windowsinfo.py<br>#窗口信息显示
 │<br>
-├── UI.py<br>#主程序入口
-├── README.md<br>#瑞德米
-├── requirements.txt<br>#依赖库列表
-└── vanex.spec<br>#
+├── UI.py#主程序入口<br>
+├── README.md#瑞德米<br>
+├── requirements.txt#依赖库列表<br>
+└── vanex.spec<br>
 > **说明**：项目中包含的 `__pycache__` 目录为 Python 自动生成的字节码缓存，已在上述结构图中省略。
 
 <font color="red">确保您已安装 Python 3.x 环境。建议使用虚拟环境来管理依赖。</font>
