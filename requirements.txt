@@ -1,5 +1,9 @@
 
-Flask
 PyQt5
 pynput
 psutil
+pynput
+pywin32 
+waitress
+pyscreeze
+pygame

@@ -8,11 +8,16 @@
     <link rel="stylesheet" href="/web/slider.css">
     <link rel="stylesheet" href="/web/toggle.css">
     <link rel="stylesheet" href="/web/style.css">
+    <link rel="stylesheet" href="/web/new.css">
+    <link rel="stylesheet" href="slider.css">
+    <link rel="stylesheet" href="toggle.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="new.css">
     <title>VaneX</title>
 </head>
 <body>
 
-    <p id="message" style="position:fixed;top:10px;right:10px;background:#222;color:#fff;padding:6px 10px;border-radius:4px;display:none;z-index:9999;"></p>
+    <p id="message" class="message"></p>
 
     <div class="column-wrapper">
         <!-- 第一列 -->
@@ -22,12 +27,22 @@
                 <button onclick="openCmd()">Open Cmd</button>
             </div>
             <div class="card">
-                <h3><i class="fa fa-skull"></i>&nbsp;&nbsp;Process Killer</h3>
+                <h3><i class="fa fa-crosshairs"></i>&nbsp;&nbsp;Process Killer</h3>
                 <div>
                     <input type="text" id="processInput" placeholder="Enter process ID or name">
                     <button onclick="killProcess()">Kill!</button>
                 </div>
                 <p id="killResult" style="color:#272727;margin-left: 21px;">Ready...</p>
+            </div>
+            <div class="card">
+                <h3><i class="fas fa-repeat"></i>&nbsp;&nbsp;Explorer Reboot<font class="dev">&nbsp;Dev&nbsp;</font></h3>
+                <button onclick="killexplorer()" style="margin-bottom:10px">Kill Explorer</button>
+                <button onclick="rebootexplorer()">Reboot Explorer</button>
+            </div>
+            <div class="card" style="border: 2px solid #981919;height:190px">
+                <h3><i class="fas fa-triangle-exclamation"></i>&nbsp;&nbsp;Crash trigger<font class="fwarning">&nbsp;Warning&nbsp;</font></h3>
+                <button onclick="    if (confirm('You are doing something dangerous!!!Are you sure? \n 你正在进行危险操作!!!你确定吗?')) { fetch('/triggerBlueScreen').catch(e=>console.error(e))}">TriggerBlueScreen</button>
+                <p class="warning" style="margin-top:10px">This will cause a blue screen of death!</p>
             </div>
         </div>
         <!-- 第二列 -->
@@ -41,7 +56,7 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
-                <h3 style="color: #aa1313;font-size: 0.9rem;">There might be some lag when starting up</h3>
+                <p class="warning">There might be some lag when starting up</p>
             </div>
 
             <div class="card" style="height:80px">
@@ -55,6 +70,39 @@
                 </div>
             </div>
 
+            <div class="card" style="height: 80px">
+                <h3><i class="fas fa-network-wired"></i>&nbsp;&nbsp;Traffic Monitor<font class="new">&nbsp;New&nbsp;</font></h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="trafficToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="card" style="height:220px">
+                <h3><i class="fas fa-clock"></i>&nbsp;&nbsp;Clock<font class="new">&nbsp;New&nbsp;</font></h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="clockToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div style="margin-top:8px;">
+                    <label for="clockSize" style="color:#808080; font-weight:bold;margin-left: 25px;">Size: <span id="clockSizeValue">200</span>px</label>
+                    <input class="custom-slider" type="range" id="clockSize" min="50" max="800" value="200" />
+                </div>
+                <div style="margin-top:8px;">
+                    <label for="clockMode" style="color:#808080; font-weight:bold;margin-left: 25px;">Mode: </label>
+                    <select id="clockMode" class="cusSelect">
+                        <option value="analog">Analog</option>
+                        <option value="digital">Digital</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="card" style="height:260px">
                 <h3><i class="fas fa-wifi"></i>&nbsp;&nbsp;Radar</h3>
                 <div class="toggle_box">
@@ -65,11 +113,11 @@
                     </label>
                 </div>
                 <div style="margin-top:0px;">
-                    <h3><label for="radarInterval">Scan interval: <span id="intervalValue">20</span>s</label></h3>
+                    <h3><label for="radarInterval" style="margin-left: 10px;">Scan interval: <span id="intervalValue">20</span>s</label></h3>
                     <input class="custom-slider" type="range" id="radarInterval" min="5" max="60" value="20" style="margin-top:-20px;" />
                 </div>
                 <div style="margin-top:0px;">
-                    <h3><label for="radarSize">Window size: <span id="sizeValue">250</span>px</label></h3>
+                    <h3><label for="radarSize" style="margin-left: 10px;">Window size: <span id="sizeValue">250</span>px</label></h3>
                     <input class="custom-slider" type="range" id="radarSize" min="150" max="800" value="250" style="margin-top:-20px;" />
                 </div>
             </div>
@@ -92,14 +140,37 @@
                         <option value="bottom_right">Bottom Right</option>
                     </select>
                 </div>
-
             </div>
-
-
-        </div>
+            </div>
             <!-- 第三列 -->
-            <div class="column">
+        <div class="column">
+            <div class="card" style="height:225px">
+                <h3><i class="fas fa-music"></i>&nbsp;&nbsp;Music Tracker<font class="new">&nbsp;New&nbsp;</font></h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="musicToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <div style="margin-top:8px;">
+                    <label for="musicSize" style="color:#808080; font-weight:bold; margin-left:25px;">Width: <span id="musicSizeValue">400</span>px</label>
+                    <input class="custom-slider" type="range" id="musicSize" min="100" max="1200" value="400" />
+                </div>
+                <p class="warning">Only CloudMusic.exe on the taskbar can be tracked</p>
             </div>
+            <div class="card" style="height:140px; margin-top:10px;">
+                <h3><i class="fas fa-camera"></i>&nbsp;&nbsp;Screenshot<font class="new">&nbsp;New&nbsp;</font></h3>
+                <div class="toggle_box">
+                    <h3>Enable</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="screenshotToggle" />
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
+                <p class="info">"Print Screen" to trigger</p>
+            </div>
+        </div>
             <!-- 第四列 -->
             <div class="column">
             </div>
@@ -126,6 +197,14 @@
                     document.getElementById('message').textContent = 'error';
                     document.getElementById('message').style.color = 'red';
                 });
+        }
+
+        function killexplorer() {
+            fetch('/killexplorer')
+        }
+
+        function rebootexplorer() {
+            fetch('/rebootexplorer')
         }
 
         // ===== Process Killer =====
@@ -286,6 +365,121 @@
                     .then(resp => resp.json().catch(() => ({})))
                     .then(data => showMessage(data.message || 'WindowInfo toggled', 2000, '#1a7f37'))
                     .catch(() => showMessage('WindowInfo request failed', 3000, '#aa1313'));
+            });
+        }
+
+        // Traffic control
+        const trafficToggle = document.getElementById('trafficToggle');
+        if (trafficToggle) {
+            trafficToggle.addEventListener('change', function () {
+                const url = this.checked ? '/traffic_enable' : '/traffic_disable';
+                fetch(url)
+                    .then(resp => resp.json().catch(() => ({})))
+                    .then(data => showMessage(data.message || 'Traffic toggled', 2000, '#1a7f37'))
+                    .catch(() => showMessage('Traffic request failed', 3000, '#aa1313'));
+            });
+        }
+
+        // Clock control
+        const clockToggle = document.getElementById('clockToggle');
+        const clockSize = document.getElementById('clockSize');
+        const clockSizeValue = document.getElementById('clockSizeValue');
+        const clockMode = document.getElementById('clockMode');
+
+        if (clockToggle) {
+            clockToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    fetch('/clock_enable', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ size: parseInt(clockSize.value), mode: clockMode.value })
+                    })
+                        .then(resp => resp.json().catch(() => ({})))
+                        .then(data => showMessage(data.message || 'Clock enabled', 2000, '#1a7f37'))
+                        .catch(() => showMessage('Clock enable failed', 3000, '#aa1313'));
+                } else {
+                    fetch('/clock_disable')
+                        .then(resp => resp.json().catch(() => ({})))
+                        .then(data => showMessage(data.message || 'Clock disabled', 2000, '#666'))
+                        .catch(() => showMessage('Clock disable failed', 3000, '#aa1313'));
+                }
+            });
+        }
+
+        if (clockSize) {
+            clockSize.addEventListener('input', function () {
+                clockSizeValue.textContent = this.value;
+                const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
+                this.style.backgroundSize = percent + '% 100%';
+            });
+            clockSize.addEventListener('change', function () {
+                fetch('/clock_set_size', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ size: parseInt(this.value) })
+                });
+            });
+        }
+
+        if (clockMode) {
+            clockMode.addEventListener('change', function () {
+                fetch('/clock_set_mode', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ mode: this.value })
+                });
+            });
+        }
+
+        // Music control
+        const musicToggle = document.getElementById('musicToggle');
+        const musicSize = document.getElementById('musicSize');
+        const musicSizeValue = document.getElementById('musicSizeValue');
+
+        if (musicToggle) {
+            musicToggle.addEventListener('change', function () {
+                if (this.checked) {
+                    fetch('/music_enable', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ width: parseInt(musicSize.value) })
+                    })
+                        .then(resp => resp.json().catch(() => ({})))
+                        .then(data => showMessage(data.message || 'Music enabled', 2000, '#1a7f37'))
+                        .catch(() => showMessage('Music enable failed', 3000, '#aa1313'));
+                } else {
+                    fetch('/music_disable')
+                        .then(resp => resp.json().catch(() => ({})))
+                        .then(data => showMessage(data.message || 'Music disabled', 2000, '#666'))
+                        .catch(() => showMessage('Music disable failed', 3000, '#aa1313'));
+                }
+            });
+        }
+
+        if (musicSize) {
+            musicSize.addEventListener('input', function () {
+                musicSizeValue.textContent = this.value;
+                const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
+                this.style.backgroundSize = percent + '% 100%';
+            });
+            musicSize.addEventListener('change', function () {
+                fetch('/music_set_size', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ width: parseInt(this.value) })
+                });
+            });
+        }
+
+        // Screenshot control
+        const screenshotToggle = document.getElementById('screenshotToggle');
+        if (screenshotToggle) {
+            screenshotToggle.addEventListener('change', function () {
+                const url = this.checked ? '/screenshot_enable' : '/screenshot_disable';
+                fetch(url)
+                    .then(resp => resp.json().catch(() => ({})))
+                    .then(data => showMessage(data.message || 'Screenshot toggled', 2000, '#1a7f37'))
+                    .catch(() => showMessage('Screenshot request failed', 3000, '#aa1313'));
             });
         }
 

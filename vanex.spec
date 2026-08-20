@@ -7,13 +7,12 @@ a = Analysis(
     binaries=[],
     datas=[
     ('web/', 'web/'),
-    ('windows_info', 'windows_info/')
+    ('windows_info', 'windows_info/'),
+    ('traffic', 'traffic/'),
+    ('music', 'music/'),
+    ('Screenshot', 'Screenshot/')
     ],
     hiddenimports=[
-    ('keyinfo.key_display'),
-    ('Radar.radar_display'),
-    ('Status_info.Status_Display'),
-    ('windows_info.windows_Display')
     ],
     hookspath=[],
     hooksconfig={},

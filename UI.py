@@ -21,6 +21,16 @@ _status_cmd_queue = None
 _windowinfo_process = None
 _windowinfo_stop_event = None
 _windowinfo_pid = None
+_traffic_process = None
+_traffic_stop_event = None
+_clock_process = None
+_clock_stop_event = None
+_clock_cmd_queue = None
+_music_process = None
+_music_stop_event = None
+_music_cmd_queue = None
+_screenshot_process = None
+_screenshot_stop_event = None
 
 
 def _run_manager_process(stop_event, x, y):
@@ -250,6 +260,299 @@ def _run_radar_process(stop_event, cmd_queue, width, height, interval):
         return
 
 
+def _run_traffic_process(stop_event):
+    """在子进程中运行 TrafficWidget 并监听停止事件。"""
+    try:
+        import os as _os
+        import sys as _sys
+        from PyQt5.QtWidgets import QApplication
+
+        # 尝试常规导入，回退到文件路径加载以兼容打包情况
+        try:
+            from traffic.traffic_display import TrafficWidget
+        except Exception:
+            import importlib.util as _importlib_util
+            if getattr(_sys, 'frozen', False):
+                _this_dir = _sys._MEIPASS
+            else:
+                _this_dir = _os.path.dirname(__file__)
+            _traffic_path = _os.path.join(_this_dir, 'traffic', 'traffic_display.py')
+            spec = _importlib_util.spec_from_file_location('traffic_display', _traffic_path)
+            traffic_mod = _importlib_util.module_from_spec(spec)
+            spec.loader.exec_module(traffic_mod)
+            TrafficWidget = getattr(traffic_mod, 'TrafficWidget')
+
+        app = QApplication([])
+        widget = TrafficWidget()
+        widget.show()
+
+        from PyQt5.QtCore import QTimer
+
+        def _poll_stop():
+            try:
+                if stop_event.is_set():
+                    app.quit()
+            except Exception:
+                app.quit()
+
+        timer = QTimer()
+        timer.timeout.connect(_poll_stop)
+        timer.start(100)
+
+        try:
+            app.exec_()
+        finally:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+            try:
+                widget.close()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Traffic 子进程错误: {e}")
+        return
+
+
+def _run_clock_process(stop_event, cmd_queue, size, mode):
+    """在子进程中运行 TransparentClock 并监听控制命令。"""
+    try:
+        import os as _os
+        import sys as _sys
+        from PyQt5.QtWidgets import QApplication
+
+        try:
+            from clock.clock import TransparentClock
+        except Exception:
+            import importlib.util as _importlib_util
+            if getattr(_sys, 'frozen', False):
+                _this_dir = _sys._MEIPASS
+            else:
+                _this_dir = _os.path.dirname(__file__)
+            _clock_path = _os.path.join(_this_dir, 'clock', 'clock.py')
+            spec = _importlib_util.spec_from_file_location('clock', _clock_path)
+            clock_mod = _importlib_util.module_from_spec(spec)
+            spec.loader.exec_module(clock_mod)
+            TransparentClock = getattr(clock_mod, 'TransparentClock')
+
+        app = QApplication([])
+
+        # 创建时钟实例
+        try:
+            widget = TransparentClock(mode=mode, size=int(size))
+        except Exception:
+            widget = TransparentClock(mode=mode)
+
+        # 默认显示
+        try:
+            widget.show_clock()
+        except Exception:
+            widget.show()
+
+        from PyQt5.QtCore import QTimer
+
+        def _poll_commands():
+            import queue as _queue
+            try:
+                while True:
+                    cmd = cmd_queue.get_nowait()
+                    if not cmd:
+                        continue
+                    action = cmd[0]
+                    if action == 'set_size' and len(cmd) > 1:
+                        try:
+                            new_size = int(cmd[1])
+                            if getattr(widget, 'mode', 'analog') == 'analog':
+                                widget.setFixedSize(new_size, new_size)
+                            else:
+                                # digital: interpret size as font size
+                                try:
+                                    widget.set_font_size(new_size)
+                                except Exception:
+                                    # fallback: adjust width
+                                    h = getattr(widget, 'digital_height', 80)
+                                    widget.setFixedSize(new_size, h)
+                            try:
+                                widget.update()
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+                    elif action == 'set_mode' and len(cmd) > 1:
+                        try:
+                            widget.set_mode(cmd[1])
+                            # 调整大小以适配新模式
+                            try:
+                                if cmd[1] == 'analog':
+                                    s = getattr(widget, 'width', widget.width())
+                                    widget.setFixedSize(s, s)
+                                else:
+                                    w = widget.width()
+                                    h = getattr(widget, 'digital_height', 80)
+                                    widget.setFixedSize(w, h)
+                            except Exception:
+                                pass
+                        except Exception:
+                            pass
+            except _queue.Empty:
+                pass
+
+            try:
+                if stop_event.is_set():
+                    app.quit()
+            except Exception:
+                app.quit()
+
+        timer = QTimer()
+        timer.timeout.connect(_poll_commands)
+        timer.start(100)
+
+        try:
+            app.exec_()
+        finally:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+            try:
+                widget.close()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Clock 子进程错误: {e}")
+        return
+
+
+def _run_music_process(stop_event, cmd_queue, width):
+    """在子进程中运行 CloudMusicTracker 并监听控制命令（宽度通过命令设置）。"""
+    try:
+        import os as _os
+        import sys as _sys
+        from PyQt5.QtWidgets import QApplication
+
+        try:
+            from music.musicinfo import CloudMusicTracker
+        except Exception:
+            import importlib.util as _importlib_util
+            if getattr(_sys, 'frozen', False):
+                _this_dir = _sys._MEIPASS
+            else:
+                _this_dir = _os.path.dirname(__file__)
+            _music_path = _os.path.join(_this_dir, 'music', 'musicinfo.py')
+            spec = _importlib_util.spec_from_file_location('musicinfo', _music_path)
+            music_mod = _importlib_util.module_from_spec(spec)
+            spec.loader.exec_module(music_mod)
+            CloudMusicTracker = getattr(music_mod, 'CloudMusicTracker')
+
+        app = QApplication([])
+        tracker = CloudMusicTracker()
+        try:
+            tracker.show()
+        except Exception:
+            try:
+                tracker.show()
+            except Exception:
+                pass
+
+        from PyQt5.QtCore import QTimer
+
+        def _poll_commands():
+            import queue as _queue
+            try:
+                while True:
+                    cmd = cmd_queue.get_nowait()
+                    if not cmd:
+                        continue
+                    action = cmd[0]
+                    if action == 'set_size' and len(cmd) > 1:
+                        try:
+                            new_w = int(cmd[1])
+                            ratio = 195 / 400.0
+                            new_h = max(50, int(new_w * ratio))
+                            try:
+                                tracker.setFixedSize(new_w, new_h)
+                            except Exception:
+                                try:
+                                    tracker.resize(new_w, new_h)
+                                except Exception:
+                                    pass
+                        except Exception:
+                            pass
+            except _queue.Empty:
+                pass
+
+            try:
+                if stop_event.is_set():
+                    app.quit()
+            except Exception:
+                app.quit()
+
+        timer = QTimer()
+        timer.timeout.connect(_poll_commands)
+        timer.start(100)
+
+        try:
+            app.exec_()
+        finally:
+            try:
+                timer.stop()
+            except Exception:
+                pass
+            try:
+                tracker.close()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Music 子进程错误: {e}")
+        return
+
+
+def _run_screenshot_process(stop_event):
+    """在子进程中运行 ScreenshotTool 并监听停止事件。"""
+    try:
+        import os as _os
+        import sys as _sys
+        import time as _time
+
+        try:
+            from Screenshot.Screenshot import ScreenshotTool
+        except Exception:
+            import importlib.util as _importlib_util
+            if getattr(_sys, 'frozen', False):
+                _this_dir = _sys._MEIPASS
+            else:
+                _this_dir = _os.path.dirname(__file__)
+            _ss_path = _os.path.join(_this_dir, 'Screenshot', 'Screenshot.py')
+            spec = _importlib_util.spec_from_file_location('screenshot', _ss_path)
+            ss_mod = _importlib_util.module_from_spec(spec)
+            spec.loader.exec_module(ss_mod)
+            ScreenshotTool = getattr(ss_mod, 'ScreenshotTool')
+
+        tool = ScreenshotTool()
+        try:
+            tool.enable()
+        except Exception:
+            try:
+                tool.enable()
+            except Exception as e:
+                print(f"Screenshot enable failed: {e}")
+
+        try:
+            while not stop_event.is_set():
+                _time.sleep(0.2)
+        except KeyboardInterrupt:
+            pass
+        finally:
+            try:
+                tool.disable()
+            except Exception:
+                pass
+    except Exception as e:
+        print(f"Screenshot 子进程错误: {e}")
+        return
+
+
 def parse_query_string(query_string):
     """解析查询字符串，返回 dict"""
     params = {}
@@ -372,6 +675,10 @@ def application(environ, start_response):
     global _radar_process, _radar_stop_event, _radar_cmd_queue
     global _status_process, _status_stop_event, _status_cmd_queue
     global _windowinfo_process, _windowinfo_stop_event, _windowinfo_pid
+    global _traffic_process, _traffic_stop_event
+    global _clock_process, _clock_stop_event, _clock_cmd_queue
+    global _music_process, _music_stop_event, _music_cmd_queue
+    global _screenshot_process, _screenshot_stop_event
     
     path = environ.get('PATH_INFO', '/')
     method = environ.get('REQUEST_METHOD', 'GET')
@@ -420,6 +727,132 @@ def application(environ, start_response):
         headers, body = plain_response("Server is working! 服务器正常运行！\n时间: " + time.strftime('%Y-%m-%d %H:%M:%S'))
         start_response('200 OK', headers)
         return [body]
+
+    # Screenshot 启用
+    elif path == '/screenshot_enable' and method == 'GET':
+        if _screenshot_process is not None and _screenshot_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Screenshot 已经在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        _screenshot_stop_event = MPEvent()
+        _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event,), daemon=True)
+        _screenshot_process.start()
+        headers, body = json_response({'success': True, 'message': 'Screenshot 已启动'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Screenshot 禁用
+    elif path == '/screenshot_disable' and method == 'GET':
+        if _screenshot_process is None or not _screenshot_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Screenshot 未在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            _screenshot_stop_event.set()
+            _screenshot_process.join(timeout=2.0)
+            if _screenshot_process.is_alive():
+                _screenshot_process.terminate()
+                _screenshot_process.join(timeout=1.0)
+        except Exception:
+            pass
+
+        _screenshot_process = None
+        _screenshot_stop_event = None
+        headers, body = json_response({'success': True, 'message': 'Screenshot 已停止'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Screenshot 状态
+    elif path == '/screenshot_status' and method == 'GET':
+        running = False
+        try:
+            if _screenshot_process is not None and _screenshot_process.is_alive():
+                running = True
+        except Exception:
+            pass
+        headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Music 启用
+    elif path == '/music_enable' and method == 'POST':
+        if _music_process is not None and _music_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Music 已经在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            width = int(post_data.get('width', 400))
+        except Exception:
+            width = 400
+
+        _music_stop_event = MPEvent()
+        _music_cmd_queue = MPQueue()
+        _music_process = Process(target=_run_music_process, args=(_music_stop_event, _music_cmd_queue, width), daemon=True)
+        _music_process.start()
+        headers, body = json_response({'success': True, 'message': 'Music 已启动'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Music 禁用
+    elif path == '/music_disable' and method == 'GET':
+        if _music_process is None or not _music_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Music 未在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            _music_stop_event.set()
+            _music_process.join(timeout=2.0)
+            if _music_process.is_alive():
+                _music_process.terminate()
+                _music_process.join(timeout=1.0)
+        except Exception:
+            pass
+
+        _music_process = None
+        _music_stop_event = None
+        _music_cmd_queue = None
+        headers, body = json_response({'success': True, 'message': 'Music 已停止'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Music 设置大小
+    elif path == '/music_set_size' and method == 'POST':
+        try:
+            width = int(post_data.get('width', 400))
+            if _music_process is None or not _music_process.is_alive() or _music_cmd_queue is None:
+                headers, body = json_response({'success': False, 'message': 'Music 未在运行'})
+                start_response('200 OK', headers)
+                return [body]
+            width = max(100, min(1200, width))
+            _music_cmd_queue.put(('set_size', width))
+            headers, body = json_response({'success': True, 'message': f'width set to {width}'})
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = json_response({'success': False, 'message': f'错误：{str(e)}'})
+            start_response('200 OK', headers)
+            return [body]
+
+    # Music 状态
+    elif path == '/music_status' and method == 'GET':
+        running = False
+        try:
+            if _music_process is not None and _music_process.is_alive():
+                running = True
+        except Exception:
+            pass
+        headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
+
+    if path =='/triggerBlueScreen' and method == 'GET':
+        from bluescreen.bluescreen import trigger_blue_screen
+        trigger_blue_screen()
+
     
     # 健康检查
     if path == '/health' and method == 'GET':
@@ -549,6 +982,56 @@ def application(environ, start_response):
         headers, body = plain_response("CMD 已打开")
         start_response('200 OK', headers)
         return [body]
+
+    # Kill Explorer
+    elif path == '/killexplorer' and method == 'GET':
+        try:
+            # 延迟导入 explorermanager，避免启动时额外依赖
+            try:
+                from explorermanager.explorermanager import kill_explorer
+            except Exception:
+                # 回退到相对导入路径
+                import importlib.util as _importlib_util
+                _this_dir = os.path.dirname(__file__)
+                _em_path = os.path.join(_this_dir, 'explorermanager', 'explorermanager.py')
+                spec = _importlib_util.spec_from_file_location('explorermanager', _em_path)
+                em_mod = _importlib_util.module_from_spec(spec)
+                spec.loader.exec_module(em_mod)
+                kill_explorer = getattr(em_mod, 'kill_explorer')
+
+            success, msg = kill_explorer()
+            status_msg = msg if isinstance(msg, str) else str(msg)
+            headers, body = plain_response(status_msg)
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = plain_response(f'错误：{e}')
+            start_response('200 OK', headers)
+            return [body]
+
+    # Reboot Explorer (kill then start)
+    elif path == '/rebootexplorer' and method == 'GET':
+        try:
+            try:
+                from explorermanager.explorermanager import reboot_explorer
+            except Exception:
+                import importlib.util as _importlib_util
+                _this_dir = os.path.dirname(__file__)
+                _em_path = os.path.join(_this_dir, 'explorermanager', 'explorermanager.py')
+                spec = _importlib_util.spec_from_file_location('explorermanager', _em_path)
+                em_mod = _importlib_util.module_from_spec(spec)
+                spec.loader.exec_module(em_mod)
+                reboot_explorer = getattr(em_mod, 'reboot_explorer')
+
+            success, msg = reboot_explorer()
+            status_msg = msg if isinstance(msg, str) else str(msg)
+            headers, body = plain_response(status_msg)
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = plain_response(f'错误：{e}')
+            start_response('200 OK', headers)
+            return [body]
     
     # Radar 启用
     elif path == '/radar_enable' and method == 'GET':
@@ -626,6 +1109,149 @@ def application(environ, start_response):
             headers, body = json_response({'success': False, 'message': f'错误：{str(e)}'})
             start_response('200 OK', headers)
             return [body]
+
+    # Traffic 启用
+    elif path == '/traffic_enable' and method == 'GET':
+        if _traffic_process is not None and _traffic_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Traffic 已经在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        _traffic_stop_event = MPEvent()
+        _traffic_process = Process(target=_run_traffic_process, args=(_traffic_stop_event,), daemon=True)
+        _traffic_process.start()
+        headers, body = json_response({'success': True, 'message': 'Traffic 已启动'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Traffic 禁用
+    elif path == '/traffic_disable' and method == 'GET':
+        if _traffic_process is None or not _traffic_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Traffic 未在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            _traffic_stop_event.set()
+            _traffic_process.join(timeout=2.0)
+            if _traffic_process.is_alive():
+                _traffic_process.terminate()
+                _traffic_process.join(timeout=1.0)
+        except Exception:
+            pass
+
+        _traffic_process = None
+        _traffic_stop_event = None
+        headers, body = json_response({'success': True, 'message': 'Traffic 已停止'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Traffic 状态
+    elif path == '/traffic_status' and method == 'GET':
+        running = False
+        try:
+            if _traffic_process is not None and _traffic_process.is_alive():
+                running = True
+        except Exception:
+            pass
+        headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Clock 启用
+    elif path == '/clock_enable' and method == 'POST':
+        if _clock_process is not None and _clock_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Clock 已经在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            size = int(post_data.get('size', 200))
+        except Exception:
+            size = 200
+        mode = post_data.get('mode', 'analog')
+
+        _clock_stop_event = MPEvent()
+        _clock_cmd_queue = MPQueue()
+        _clock_process = Process(target=_run_clock_process, args=(_clock_stop_event, _clock_cmd_queue, size, mode), daemon=True)
+        _clock_process.start()
+        headers, body = json_response({'success': True, 'message': 'Clock 已启动'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Clock 禁用
+    elif path == '/clock_disable' and method == 'GET':
+        if _clock_process is None or not _clock_process.is_alive():
+            headers, body = json_response({'success': False, 'message': 'Clock 未在运行'})
+            start_response('200 OK', headers)
+            return [body]
+
+        try:
+            _clock_stop_event.set()
+            _clock_process.join(timeout=2.0)
+            if _clock_process.is_alive():
+                _clock_process.terminate()
+                _clock_process.join(timeout=1.0)
+        except Exception:
+            pass
+
+        _clock_process = None
+        _clock_stop_event = None
+        _clock_cmd_queue = None
+        headers, body = json_response({'success': True, 'message': 'Clock 已停止'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Clock 设置大小
+    elif path == '/clock_set_size' and method == 'POST':
+        try:
+            size = int(post_data.get('size', 200))
+            if _clock_process is None or not _clock_process.is_alive() or _clock_cmd_queue is None:
+                headers, body = json_response({'success': False, 'message': 'Clock 未在运行'})
+                start_response('200 OK', headers)
+                return [body]
+            size = max(50, min(1000, size))
+            _clock_cmd_queue.put(('set_size', size))
+            headers, body = json_response({'success': True, 'message': f'size set to {size}'})
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = json_response({'success': False, 'message': f'错误：{str(e)}'})
+            start_response('200 OK', headers)
+            return [body]
+
+    # Clock 设置模式
+    elif path == '/clock_set_mode' and method == 'POST':
+        try:
+            mode = post_data.get('mode', 'analog')
+            if _clock_process is None or not _clock_process.is_alive() or _clock_cmd_queue is None:
+                headers, body = json_response({'success': False, 'message': 'Clock 未在运行'})
+                start_response('200 OK', headers)
+                return [body]
+            if mode not in ('analog', 'digital'):
+                headers, body = json_response({'success': False, 'message': 'invalid mode'})
+                start_response('200 OK', headers)
+                return [body]
+            _clock_cmd_queue.put(('set_mode', mode))
+            headers, body = json_response({'success': True, 'message': f'mode set to {mode}'})
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = json_response({'success': False, 'message': f'错误：{str(e)}'})
+            start_response('200 OK', headers)
+            return [body]
+
+    # Clock 状态
+    elif path == '/clock_status' and method == 'GET':
+        running = False
+        try:
+            if _clock_process is not None and _clock_process.is_alive():
+                running = True
+        except Exception:
+            pass
+        headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
     
     # Status Monitor 启用
     elif path == '/status_enable' and method == 'POST':

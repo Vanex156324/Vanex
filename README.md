@@ -3,16 +3,40 @@
 
 **项目结构：**<br>
 项目根目录/<br>
+├── bluescreen<br>
+│ └── bluescreen.py#奔溃触发器<br>
+│ <br>
+├── clock<br>
+│ └── clock.py#时钟显示<br>
+│ <br>
+├── explorermanager<br>
+│ └── explorermanager.py#资源管理器控制器<br>
+│ <br>
 ├── keyinfo/<br>
-│ └── key_display.py<br>#按键显示
+│ └── key_display.py#按键显示<br>
+│<br>
+├── music<br>
+│ ├── left.png<br>
+│ ├── musicinfo.py#音乐信息显示<br>
+│ ├── right.py<br>
+│ └── stop.png<br>
 │<br>
 ├── Radar/<br>
-│ └── radar_display.py<br>#雷达显示
+│ └── radar_display.py#雷达显示<br>
+│<br>
+├── traffic<br>
+│ ├── Screenshot.mp3<br>
+│ └── Screenshot.py#截屏相关<br>
 │<br>
 ├── Status_info/<br>
-│ └── Status_Display.py<br>#系统信息显示
+│ └── Status_Display.py#系统信息显示<br>
 │<br>
-├── web/<br>#前端
+├── traffic<br>
+│ ├── down.png<br>
+│ ├── traffic_display.py#流量信息显示<br>
+│ └── up.png<br>
+│<br>
+├── web/#前端<br>
 │ ├── index.html<br>
 │ ├── slider.css<br>
 │ ├── style.css<br>
@@ -22,12 +46,13 @@
 │ ├── admin.png<br>
 │ ├── system.png<br>
 │ ├── user.png<br>
-│ └── windowsinfo.py<br>#窗口信息显示
+│ └── windowsinfo.py#窗口信息显示<br>
 │<br>
 ├── UI.py#主程序入口<br>
 ├── README.md#瑞德米<br>
 ├── requirements.txt#依赖库列表<br>
-└── vanex.spec<br>
+└── vanex.spec#打包文件<br>
+
 > **说明**：项目中包含的 `__pycache__` 目录为 Python 自动生成的字节码缓存，已在上述结构图中省略。
 
 <font color="red">确保您已安装 Python 3.x 环境。建议使用虚拟环境来管理依赖。</font>
