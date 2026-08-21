@@ -12,8 +12,10 @@
 ├── explorermanager<br>
 │ └── explorermanager.py#资源管理器控制器<br>
 │ <br>
-├── keyinfo/<br>
-│ └── key_display.py#按键显示<br>
+├── keyinfo<br>
+│ ├── key_display.py#按键显示<br>
+│ ├── lmb.png<br>
+│ └── rmb.png<br>
 │<br>
 ├── music<br>
 │ ├── left.png<br>
@@ -21,14 +23,14 @@
 │ ├── right.py<br>
 │ └── stop.png<br>
 │<br>
-├── Radar/<br>
+├── Radar<br>
 │ └── radar_display.py#雷达显示<br>
 │<br>
-├── traffic<br>
+├── Screenshot<br>
 │ ├── Screenshot.mp3<br>
 │ └── Screenshot.py#截屏相关<br>
 │<br>
-├── Status_info/<br>
+├── Status_info<br>
 │ └── Status_Display.py#系统信息显示<br>
 │<br>
 ├── traffic<br>
@@ -36,13 +38,16 @@
 │ ├── traffic_display.py#流量信息显示<br>
 │ └── up.png<br>
 │<br>
-├── web/#前端<br>
+├── UACpypass<br>
+│ └── UacBypAsS.py#UAC绕过<br>
+│<br>
+├── web#前端<br>
 │ ├── index.html<br>
 │ ├── slider.css<br>
 │ ├── style.css<br>
 │ └── toggle.css<br>
 │<br>
-├── windows_info/<br>
+├── windows_info<br>
 │ ├── admin.png<br>
 │ ├── system.png<br>
 │ ├── user.png<br>
@@ -51,6 +56,7 @@
 ├── UI.py#主程序入口<br>
 ├── README.md#瑞德米<br>
 ├── requirements.txt#依赖库列表<br>
+├── appicon.ico#程序图标<br>
 └── vanex.spec#打包文件<br>
 
 > **说明**：项目中包含的 `__pycache__` 目录为 Python 自动生成的字节码缓存，已在上述结构图中省略。

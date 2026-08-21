@@ -13,36 +13,55 @@
     <link rel="stylesheet" href="toggle.css">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="new.css">
+    <script src="https://unpkg.com/peerjs@1.4.7/dist/peerjs.min.js"></script>
     <title>VaneX</title>
+    <!-- 添加音效播放器 -->
+    <script>
+        // 音效播放函数
+        function playSound() {
+            try {
+                const audio = new Audio('/web/sound.wav');
+                audio.volume = 0.5;
+                audio.play().catch(function (e) {
+                    // 静默处理自动播放策略错误
+                });
+            } catch (e) {
+                // 静默处理错误
+            }
+        }
+    </script>
 </head>
 <body>
-
-    <p id="message" class="message"></p>
 
     <div class="column-wrapper">
         <!-- 第一列 -->
         <div class="column">
             <div class="card" style="height:100px">
                 <h3><i class="fa fa-terminal"></i>&nbsp;&nbsp;Cmd</h3>
-                <button onclick="openCmd()">Open Cmd</button>
+                <button onclick="playSound();openCmd()">Open Cmd</button>
             </div>
             <div class="card">
                 <h3><i class="fa fa-crosshairs"></i>&nbsp;&nbsp;Process Killer</h3>
                 <div>
                     <input type="text" id="processInput" placeholder="Enter process ID or name">
-                    <button onclick="killProcess()">Kill!</button>
+                    <button onclick="playSound();killProcess()">Kill!</button>
                 </div>
                 <p id="killResult" style="color:#272727;margin-left: 21px;">Ready...</p>
             </div>
             <div class="card">
-                <h3><i class="fas fa-repeat"></i>&nbsp;&nbsp;Explorer Reboot<font class="dev">&nbsp;Dev&nbsp;</font></h3>
-                <button onclick="killexplorer()" style="margin-bottom:10px">Kill Explorer</button>
-                <button onclick="rebootexplorer()">Reboot Explorer</button>
+                <h3><i class="fas fa-repeat"></i>&nbsp;&nbsp;Explorer Reboot<font class="new">&nbsp;New&nbsp;</font></h3>
+                <button onclick="playSound();killexplorer()" style="margin-bottom:10px">Kill Explorer</button>
+                <button onclick="playSound();rebootexplorer()">Reboot Explorer</button>
             </div>
             <div class="card" style="border: 2px solid #981919;height:190px">
                 <h3><i class="fas fa-triangle-exclamation"></i>&nbsp;&nbsp;Crash trigger<font class="fwarning">&nbsp;Warning&nbsp;</font></h3>
-                <button onclick="    if (confirm('You are doing something dangerous!!!Are you sure? \n 你正在进行危险操作!!!你确定吗?')) { fetch('/triggerBlueScreen').catch(e=>console.error(e))}">TriggerBlueScreen</button>
+                <button onclick="playSound();if (confirm('You are doing something dangerous!!!Are you sure? \n 你正在进行危险操作!!!你确定吗?')) { fetch('/triggerBlueScreen').catch(e=>console.error(e))}">TriggerBlueScreen</button>
                 <p class="warning" style="margin-top:10px">This will cause a blue screen of death!</p>
+            </div>
+            <div class="card" style="border: 2px solid #981919;height:170px">
+                <h3><i class="fas fa-hammer"></i>&nbsp;&nbsp;UAC Bypass<font class="fwarning">&nbsp;Warning&nbsp;</font></h3>
+                <button onclick="playSound();if (confirm('You are doing something dangerous!!!Are you sure? \n 你正在进行危险操作!!!你确定吗?')) { fetch('/BypassUac').catch(e=>console.error(e))}">Bypass UAC</button>
+                <p class="warning" style="margin-top:10px">This usually gets blocked!</p>
             </div>
         </div>
         <!-- 第二列 -->
@@ -71,7 +90,7 @@
             </div>
 
             <div class="card" style="height: 80px">
-                <h3><i class="fas fa-network-wired"></i>&nbsp;&nbsp;Traffic Monitor<font class="new">&nbsp;New&nbsp;</font></h3>
+                <h3><i class="fas fa-network-wired"></i>&nbsp;&nbsp;Traffic Monitor</h3>
                 <div class="toggle_box">
                     <h3>Enable</h3>
                     <label class="toggle">
@@ -82,7 +101,7 @@
             </div>
 
             <div class="card" style="height:220px">
-                <h3><i class="fas fa-clock"></i>&nbsp;&nbsp;Clock<font class="new">&nbsp;New&nbsp;</font></h3>
+                <h3><i class="fas fa-clock"></i>&nbsp;&nbsp;Clock</h3>
                 <div class="toggle_box">
                     <h3>Enable</h3>
                     <label class="toggle">
@@ -141,11 +160,8 @@
                     </select>
                 </div>
             </div>
-            </div>
-            <!-- 第三列 -->
-        <div class="column">
             <div class="card" style="height:225px">
-                <h3><i class="fas fa-music"></i>&nbsp;&nbsp;Music Tracker<font class="new">&nbsp;New&nbsp;</font></h3>
+                <h3><i class="fas fa-music"></i>&nbsp;&nbsp;Music Tracker</h3>
                 <div class="toggle_box">
                     <h3>Enable</h3>
                     <label class="toggle">
@@ -159,8 +175,11 @@
                 </div>
                 <p class="warning">Only CloudMusic.exe on the taskbar can be tracked</p>
             </div>
-            <div class="card" style="height:140px; margin-top:10px;">
-                <h3><i class="fas fa-camera"></i>&nbsp;&nbsp;Screenshot<font class="new">&nbsp;New&nbsp;</font></h3>
+        </div>
+        <!-- 第三列 -->
+        <div class="column">
+            <div class="card" style="height:210px;">
+                <h3><i class="fas fa-camera"></i>&nbsp;&nbsp;Screenshot</h3>
                 <div class="toggle_box">
                     <h3>Enable</h3>
                     <label class="toggle">
@@ -168,34 +187,68 @@
                         <span class="toggle-slider"></span>
                     </label>
                 </div>
+                <div class="toggle_box" style="margin-top:0px;">
+                    <h3>Sound</h3>
+                    <label class="toggle">
+                        <input type="checkbox" class="toggle-input" id="screenshotSoundToggle"/>
+                        <span class="toggle-slider"></span>
+                    </label>
+                </div>
                 <p class="info">"Print Screen" to trigger</p>
             </div>
+            <div class="card" style="height:247px;">
+                <h3><i class="fas fa-gear"></i>&nbsp;&nbsp;Setting<font class="new">&nbsp;New&nbsp;</font></h3>
+                <button onclick="playSound();(async () => { if (confirm('Are you sure you want to uninstall?')) { await fetch('/SelfDelete').catch(e=>console.error(e)); window.close(); } })()">Uninstall</button>
+                <p class="warning" style="margin-top: 10px;">This will delete screenshots and settings!</p>
+                <button onclick="playSound();(async () => { if (confirm('Quit?')) { await fetch('/quit').catch(e=>console.error(e)); window.close(); } })()" style="margin-top: 9px;">Quit</button>
+            </div>
+            <div class="card" style="height:480px;">
+                <h3 style="margin-top:0; margin-bottom:8px; flex-shrink:0;">
+                    <i class="fas fa-comments"></i>&nbsp;&nbsp;ChatBar<font class="new">&nbsp;New&nbsp;</font>
+                </h3>
+                <!-- 对方ID输入 -->
+                <div style="display:flex; gap:6px; flex-shrink:0; margin-bottom:6px;">
+                    <input type="text" id="p2pPeerInput" placeholder="Enter the other person's ID"
+                           style="width:220px;margin-left:10px;">
+                </div>
+                <!-- 消息列表 -->
+                <div id="p2pMessages" class="p2pMessages">
+                    <div style="color:#888; text-align:center; padding:20px 0;">Enter the other person's ID to start chatting</div>
+                </div>
+                <!-- 消息输入 -->
+                <div style="display:flex; gap:6px; flex-shrink:0;">
+                    <input type="text" id="p2pMsgInput" placeholder="Enter to send"
+                           style="width: 220px; margin-left: 10px;">
+                </div>
+                <!-- 状态显示 -->
+                <div style="display:flex; justify-content:space-between; margin-top:4px; font-size:11px; color:#666; flex-shrink:0;">
+                    <span id="p2pStatus" style="margin-left:10px"></span>
+                    <span id="p2pMyId" style="margin-right:10px">ID: --</span>
+                </div>
+                <p class="info" style="margin-top:10px">Only allowed for use within the local network</p>
+            </div>
         </div>
-            <!-- 第四列 -->
-            <div class="column">
-            </div>
-            <!-- 第五列 -->
-            <div class="column">
-            </div>
-            <!-- 第六列 -->
-            <div class="column">
-            </div>
+        <!-- 第四列 -->
+        <div class="column">
         </div>
+        <!-- 第五列 -->
+        <div class="column">
+        </div>
+        <!-- 第六列 -->
+        <div class="column">
+        </div>
+    </div>
 
     <script>
+        // ===== 音效播放函数（已定义在head中） =====
+        // playSound() 已在 head 中定义
+
         // ===== CMD =====
         function openCmd() {
             fetch('/open_cmd')
                 .then(response => response.text())
-                .then(data => {
-                    document.getElementById('message').textContent = data;
-                    setTimeout(() => {
-                        document.getElementById('message').textContent = '';
-                    }, 3000);  // 3秒后自动消失
-                })
                 .catch(error => {
-                    document.getElementById('message').textContent = 'error';
-                    document.getElementById('message').style.color = 'red';
+                    console.error('Cmd error:', error);
                 });
         }
 
@@ -252,28 +305,20 @@
             if (input) {
                 input.addEventListener('keypress', function (e) {
                     if (e.key === 'Enter') {
+                        playSound();
                         killProcess();
                     }
                 });
             }
         });
 
-        function showMessage(text, timeout = 3000, bg = '#222') {
-            const el = document.getElementById('message');
-            if (!el) return;
-            el.textContent = text;
-            el.style.background = bg;
-            el.style.display = 'block';
-            clearTimeout(el._hideTimer);
-            el._hideTimer = setTimeout(() => { el.style.display = 'none'; }, timeout);
-        }
-
+        // 移除 showMessage 相关函数调用，改用 console 静默处理
         document.getElementById('keyToggle').addEventListener('change', function () {
+            playSound();
             const url = this.checked ? '/keyToggle_enable' : '/keyToggle_disable';
             fetch(url)
                 .then(resp => resp.json())
-                .then(data => showMessage(data.message || JSON.stringify(data), 3000, '#1a7f37'))
-                .catch(err => showMessage('Request error', 3000, '#aa1313'));
+                .catch(err => console.error('KeyToggle error:', err));
         });
 
         // Radar control
@@ -284,21 +329,21 @@
         const sizeValue = document.getElementById('sizeValue');
 
         radarToggle.addEventListener('change', function () {
+            playSound();
             const url = this.checked ? '/radar_enable' : '/radar_disable';
             fetch(url)
                 .then(resp => resp.json().catch(() => ({})))
-                .then(data => showMessage(data.message || 'Radar toggled', 2000, '#1a7f37'))
-                .catch(() => showMessage('Radar request failed', 3000, '#aa1313'));
+                .catch(() => console.error('Radar toggle error'));
         });
 
         radarInterval.addEventListener('input', function () {
             intervalValue.textContent = this.value;
-            // 同步滑块背景进度
             const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
             this.style.backgroundSize = percent + '% 100%';
         });
 
         radarInterval.addEventListener('change', function () {
+            playSound();
             fetch('/radar_set_interval', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -308,14 +353,13 @@
 
         radarSize.addEventListener('input', function () {
             sizeValue.textContent = this.value;
-            // 同步滑块背景进度
             const percent = ((this.value - this.min) / (this.max - this.min)) * 100;
             this.style.backgroundSize = percent + '% 100%';
         });
 
         radarSize.addEventListener('change', function () {
+            playSound();
             const size = parseInt(this.value);
-            // 将宽高都设置为同一值
             fetch('/radar_set_size', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -328,6 +372,7 @@
         const statusCorner = document.getElementById('statusCorner');
         if (statusToggle) {
             statusToggle.addEventListener('change', function () {
+                playSound();
                 if (this.checked) {
                     fetch('/status_enable', {
                         method: 'POST',
@@ -335,19 +380,18 @@
                         body: JSON.stringify({ corner: statusCorner ? statusCorner.value : 'top_right' })
                     })
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Status enabled', 2000, '#1a7f37'))
-                        .catch(() => showMessage('Status enable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Status enable error'));
                 } else {
                     fetch('/status_disable')
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Status disabled', 2000, '#666'))
-                        .catch(() => showMessage('Status disable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Status disable error'));
                 }
             });
         }
 
         if (statusCorner) {
             statusCorner.addEventListener('change', function () {
+                playSound();
                 fetch('/status_set_corner', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -360,11 +404,11 @@
         const windowInfoToggle = document.getElementById('windowInfoToggle');
         if (windowInfoToggle) {
             windowInfoToggle.addEventListener('change', function () {
+                playSound();
                 const url = this.checked ? '/windowinfo_enable' : '/windowinfo_disable';
                 fetch(url)
                     .then(resp => resp.json().catch(() => ({})))
-                    .then(data => showMessage(data.message || 'WindowInfo toggled', 2000, '#1a7f37'))
-                    .catch(() => showMessage('WindowInfo request failed', 3000, '#aa1313'));
+                    .catch(() => console.error('WindowInfo error'));
             });
         }
 
@@ -372,11 +416,11 @@
         const trafficToggle = document.getElementById('trafficToggle');
         if (trafficToggle) {
             trafficToggle.addEventListener('change', function () {
+                playSound();
                 const url = this.checked ? '/traffic_enable' : '/traffic_disable';
                 fetch(url)
                     .then(resp => resp.json().catch(() => ({})))
-                    .then(data => showMessage(data.message || 'Traffic toggled', 2000, '#1a7f37'))
-                    .catch(() => showMessage('Traffic request failed', 3000, '#aa1313'));
+                    .catch(() => console.error('Traffic error'));
             });
         }
 
@@ -388,6 +432,7 @@
 
         if (clockToggle) {
             clockToggle.addEventListener('change', function () {
+                playSound();
                 if (this.checked) {
                     fetch('/clock_enable', {
                         method: 'POST',
@@ -395,13 +440,11 @@
                         body: JSON.stringify({ size: parseInt(clockSize.value), mode: clockMode.value })
                     })
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Clock enabled', 2000, '#1a7f37'))
-                        .catch(() => showMessage('Clock enable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Clock enable error'));
                 } else {
                     fetch('/clock_disable')
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Clock disabled', 2000, '#666'))
-                        .catch(() => showMessage('Clock disable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Clock disable error'));
                 }
             });
         }
@@ -413,6 +456,7 @@
                 this.style.backgroundSize = percent + '% 100%';
             });
             clockSize.addEventListener('change', function () {
+                playSound();
                 fetch('/clock_set_size', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -423,6 +467,7 @@
 
         if (clockMode) {
             clockMode.addEventListener('change', function () {
+                playSound();
                 fetch('/clock_set_mode', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -438,6 +483,7 @@
 
         if (musicToggle) {
             musicToggle.addEventListener('change', function () {
+                playSound();
                 if (this.checked) {
                     fetch('/music_enable', {
                         method: 'POST',
@@ -445,13 +491,11 @@
                         body: JSON.stringify({ width: parseInt(musicSize.value) })
                     })
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Music enabled', 2000, '#1a7f37'))
-                        .catch(() => showMessage('Music enable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Music enable error'));
                 } else {
                     fetch('/music_disable')
                         .then(resp => resp.json().catch(() => ({})))
-                        .then(data => showMessage(data.message || 'Music disabled', 2000, '#666'))
-                        .catch(() => showMessage('Music disable failed', 3000, '#aa1313'));
+                        .catch(() => console.error('Music disable error'));
                 }
             });
         }
@@ -463,6 +507,7 @@
                 this.style.backgroundSize = percent + '% 100%';
             });
             musicSize.addEventListener('change', function () {
+                playSound();
                 fetch('/music_set_size', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
@@ -473,13 +518,24 @@
 
         // Screenshot control
         const screenshotToggle = document.getElementById('screenshotToggle');
+        const screenshotSoundToggle = document.getElementById('screenshotSoundToggle');
         if (screenshotToggle) {
             screenshotToggle.addEventListener('change', function () {
+                playSound();
                 const url = this.checked ? '/screenshot_enable' : '/screenshot_disable';
                 fetch(url)
                     .then(resp => resp.json().catch(() => ({})))
-                    .then(data => showMessage(data.message || 'Screenshot toggled', 2000, '#1a7f37'))
-                    .catch(() => showMessage('Screenshot request failed', 3000, '#aa1313'));
+                    .catch(() => console.error('Screenshot error'));
+            });
+        }
+
+        if (screenshotSoundToggle) {
+            screenshotSoundToggle.addEventListener('change', function () {
+                playSound();
+                const url = this.checked ? '/screenshot_sound_enable' : '/screenshot_sound_disable';
+                fetch(url)
+                    .then(resp => resp.json().catch(() => ({})))
+                    .catch(() => console.error('Screenshot sound error'));
             });
         }
 
@@ -488,6 +544,270 @@
             const percent = ((slider.value - slider.min) / (slider.max - slider.min)) * 100;
             slider.style.backgroundSize = percent + '% 100%';
         });
+
+        // 从服务器加载持久化状态并恢复界面设置
+        fetch('/get_state')
+            .then(r => r.json().catch(() => ({})))
+            .then(state => {
+                try {
+                    if (!state) return;
+                    const keyToggle = document.getElementById('keyToggle');
+                    if (keyToggle && typeof state.key === 'boolean') keyToggle.checked = !!state.key;
+
+                    const windowInfoToggle = document.getElementById('windowInfoToggle');
+                    if (windowInfoToggle && typeof state.windowinfo === 'boolean') windowInfoToggle.checked = !!state.windowinfo;
+
+                    const radarToggle = document.getElementById('rader');
+                    if (radarToggle && state.radar) radarToggle.checked = !!state.radar.enabled;
+                    if (state.radar && state.radar.interval) {
+                        const ri = document.getElementById('radarInterval');
+                        const iv = document.getElementById('intervalValue');
+                        if (ri) { ri.value = state.radar.interval; ri.style.backgroundSize = (((ri.value - ri.min) / (ri.max - ri.min)) * 100) + '% 100%'; }
+                        if (iv) iv.textContent = state.radar.interval;
+                    }
+                    if (state.radar && (state.radar.width || state.radar.height || state.radar.size)) {
+                        const rs = document.getElementById('radarSize');
+                        const sv = document.getElementById('sizeValue');
+                        const sz = state.radar.width || state.radar.height || state.radar.size;
+                        if (rs) { rs.value = sz; rs.style.backgroundSize = (((rs.value - rs.min) / (rs.max - rs.min)) * 100) + '% 100%'; }
+                        if (sv) sv.textContent = sz;
+                    }
+
+                    const trafficToggle = document.getElementById('trafficToggle');
+                    if (trafficToggle && typeof state.traffic === 'boolean') trafficToggle.checked = !!state.traffic;
+
+                    const clockToggle = document.getElementById('clockToggle');
+                    const clockSize = document.getElementById('clockSize');
+                    const clockSizeValue = document.getElementById('clockSizeValue');
+                    const clockMode = document.getElementById('clockMode');
+                    if (clockToggle && state.clock) clockToggle.checked = !!state.clock.enabled;
+                    if (state.clock && state.clock.size && clockSize) { clockSize.value = state.clock.size; clockSize.style.backgroundSize = (((clockSize.value - clockSize.min) / (clockSize.max - clockSize.min)) * 100) + '% 100%'; }
+                    if (state.clock && state.clock.size && clockSizeValue) clockSizeValue.textContent = state.clock.size;
+                    if (state.clock && state.clock.mode && clockMode) clockMode.value = state.clock.mode;
+
+                    const statusToggle = document.getElementById('statusToggle');
+                    const statusCorner = document.getElementById('statusCorner');
+                    if (statusToggle && state.status) statusToggle.checked = !!state.status.enabled;
+                    if (statusCorner && state.status && state.status.corner) statusCorner.value = state.status.corner;
+
+                    const musicToggle = document.getElementById('musicToggle');
+                    const musicSize = document.getElementById('musicSize');
+                    const musicSizeValue = document.getElementById('musicSizeValue');
+                    if (musicToggle && state.music) musicToggle.checked = !!state.music.enabled;
+                    if (state.music && state.music.width && musicSize) { musicSize.value = state.music.width; musicSize.style.backgroundSize = (((musicSize.value - musicSize.min) / (musicSize.max - musicSize.min)) * 100) + '% 100%'; }
+                    if (state.music && state.music.width && musicSizeValue) musicSizeValue.textContent = state.music.width;
+
+                    const screenshotToggle = document.getElementById('screenshotToggle');
+                    if (screenshotToggle && typeof state.screenshot === 'boolean') screenshotToggle.checked = !!state.screenshot;
+                    const screenshotSoundToggle = document.getElementById('screenshotSoundToggle');
+                    if (screenshotSoundToggle && typeof state.screenshot_sound !== 'undefined') screenshotSoundToggle.checked = !!state.screenshot_sound;
+                } catch (e) {
+                    console.error('apply state error', e);
+                }
+            })
+            .catch(e => { console.warn('load state failed', e); });
+
+        /// ===== P2P ChatBar =====
+        (function () {
+            let peer = null;
+            let conn = null;
+            let myId = 'vanex-' + Math.random().toString(36).substr(2, 8);
+            let isInitialized = false;
+
+            const messagesEl = document.getElementById('p2pMessages');
+            const peerInput = document.getElementById('p2pPeerInput');
+            const msgInput = document.getElementById('p2pMsgInput');
+            const statusEl = document.getElementById('p2pStatus');
+            const myIdEl = document.getElementById('p2pMyId');
+
+            function addChatMessage(sender, text, type) {
+                const div = document.createElement('div');
+                div.style.cssText = 'margin-bottom:6px; padding:5px 10px; border-radius:12px; max-width:80%; word-wrap:break-word; clear:both;';
+
+                if (type === 'system') {
+                    div.style.cssText += 'background:transparent; color:#888; text-align:center; max-width:100%; font-style:italic; font-size:12px;';
+                    div.textContent = text;
+                } else if (type === 'sent') {
+                    div.style.cssText += 'background:#252525; color:white; float:right;';
+                    div.innerHTML = '<strong style="font-size:11px;color:#aad0e8;">Your</strong><br>' + text + '<br><small style="font-size:10px;color:#8ab4c8;">' + new Date().toLocaleTimeString() + '</small>';
+                } else {
+                    div.style.cssText += 'background:#303030; color:white; float:left;';
+                    div.innerHTML = '<strong style="font-size:11px;color:#6aafd0;">' + sender + '</strong><br>' + text + '<br><small style="font-size:10px;color:#777;">' + new Date().toLocaleTimeString() + '</small>';
+                }
+
+                messagesEl.appendChild(div);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            }
+
+            function updateStatus(text, color) {
+                statusEl.textContent = text;
+                statusEl.style.color = color || '#666';
+            }
+
+            function initPeer() {
+                if (isInitialized) return;
+
+                peer = new Peer(myId, {
+                    host: '0.peerjs.com',
+                    port: 443,
+                    path: '/',
+                    config: {
+                        'iceServers': [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun1.l.google.com:19302' },
+                            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' }
+                        ]
+                    },
+                    debug: 0
+                });
+
+                peer.on('open', function (id) {
+                    myId = id;
+                    myIdEl.textContent = 'ID: ' + id;
+                    updateStatus('Ready', '');
+                    addChatMessage('info', 'Your ID: ' + id, 'system');
+                    isInitialized = true;
+                });
+
+                peer.on('connection', function (connection) {
+                    if (conn && conn.open) { try { conn.close(); } catch (_) { } }
+                    conn = connection;
+                    setupConnection();
+                    addChatMessage('info', 'Connection received', 'system');
+                    updateStatus('Online', '');
+                });
+
+                peer.on('error', function (err) {
+                    console.error('Peer error:', err);
+                    if (err.type === 'unavailable-id') {
+                        myId = 'Vanex-' + Math.random().toString(36).substr(2, 8);
+                        addChatMessage('info', 'ID conflict, regenerate...', 'system');
+                        isInitialized = false;
+                        initPeer();
+                    } else {
+                        addChatMessage('info', 'error: ' + (err.message || err.type), 'system');
+                        updateStatus('Error', '');
+                    }
+                });
+
+                peer.on('disconnected', function () {
+                    updateStatus('Disconnect', '');
+                    addChatMessage('info', 'Disconnected from the server', 'system');
+                });
+            }
+
+            function setupConnection() {
+                if (!conn) return;
+
+                conn.on('open', function () {
+                    updateStatus('Connected', '#5a8');
+                    addChatMessage('info', 'Connected successfully', 'system');
+                });
+
+                conn.on('data', function (data) {
+                    if (data && typeof data === 'object' && data.sender && data.message !== undefined) {
+                        addChatMessage(data.sender, data.message, 'received');
+                    } else {
+                        addChatMessage('the other person', String(data), 'received');
+                    }
+                });
+
+                conn.on('close', function () {
+                    updateStatus('Closed', '');
+                    addChatMessage('info', 'Connection closed', 'system');
+                    conn = null;
+                });
+
+                conn.on('error', function (err) {
+                    console.error('Connection error:', err);
+                    addChatMessage('info', 'error: ' + (err.message || err.type), 'system');
+                    updateStatus('Error', '');
+                    conn = null;
+                });
+            }
+
+            function doConnect(targetId) {
+                if (!targetId) {
+                    addChatMessage('info', 'Please enter the other personz ID', 'system');
+                    return;
+                }
+                if (targetId === myId) {
+                    addChatMessage('info', 'Can t connect to yourself', 'system');
+                    return;
+                }
+                if (conn && conn.open) {
+                    if (conn.peer === targetId) {
+                        addChatMessage('info', 'Connected with this ID', 'system');
+                        return;
+                    } else {
+                        try { conn.close(); } catch (_) { }
+                        conn = null;
+                    }
+                }
+
+                if (!peer || peer.destroyed) {
+                    addChatMessage('info', 'Initializing...', 'system');
+                    isInitialized = false;
+                    initPeer();
+                    setTimeout(function () {
+                        doConnect(targetId);
+                    }, 500);
+                    return;
+                }
+
+                addChatMessage('info', 'Connecting ' + targetId + ' ...', 'system');
+                updateStatus('Connecting...', '');
+                try {
+                    conn = peer.connect(targetId);
+                    setupConnection();
+                } catch (e) {
+                    addChatMessage('info', 'Error: ' + e.message, 'system');
+                    updateStatus('Error', '');
+                }
+            }
+
+            function doSend() {
+                const text = msgInput.value.trim();
+                if (!text) return;
+                if (!conn || !conn.open) {
+                    addChatMessage('info', 'Not connected', 'system');
+                    return;
+                }
+                conn.send({ sender: myId, message: text });
+                addChatMessage('Your', text, 'sent');
+                msgInput.value = '';
+            }
+
+            // ---- 事件绑定（纯回车） ----
+            peerInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    playSound();
+                    doConnect(this.value.trim());
+                }
+            });
+
+            msgInput.addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    playSound();
+                    doSend();
+                }
+            });
+
+            // 清理函数
+            window._p2pCleanup = function () {
+                if (conn) { try { conn.close(); } catch (_) { } }
+                if (peer) { try { peer.destroy(); } catch (_) { } }
+                conn = null;
+                peer = null;
+                isInitialized = false;
+            };
+
+            // 初始化
+            initPeer();
+        })();
     </script>
 </body>
 </html>

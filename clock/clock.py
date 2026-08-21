@@ -185,13 +185,11 @@ class TransparentClock(QWidget):
             self.dragging = False
             event.accept()
     
-    # 双击切换模式
-    def mouseDoubleClickEvent(self, event):
-        if event.button() == Qt.LeftButton:
-            self.toggle_mode()
+    # ---- 删除 mouseDoubleClickEvent 方法，去除双击切换功能 ----
+    # 不再响应双击事件
 
     def toggle_mode(self):
-        """切换模拟/数字模式"""
+        """切换模拟/数字模式（可通过外部调用）"""
         if self.mode == "analog":
             self.set_mode("digital")
         else:

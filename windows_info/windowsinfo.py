@@ -10,7 +10,7 @@ from ctypes import wintypes
 import psutil
 from PyQt5.QtWidgets import QApplication, QWidget, QVBoxLayout, QLabel, QHBoxLayout
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPixmap, QPen
+from PyQt5.QtGui import QFont, QColor, QPalette, QPainter, QBrush, QPixmap, QPen, QPainterPath
 
 
 class WindowInfoCore:
@@ -179,6 +179,23 @@ class WindowInfoCore:
         return filename
 
 
+class InfoTag(QLabel):
+    """信息标签 - 带半透明深灰色背景的小盒子"""
+    
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setFont(QFont("Microsoft YaHei", 9, QFont.Bold))
+        self.setStyleSheet("""
+            QLabel {
+                color: #E0E0E0;
+                background-color: rgba(20, 20, 20, 180);
+                border-radius: 6px;
+                padding: 4px 10px;
+            }
+        """)
+        self.setAlignment(Qt.AlignCenter)
+
+
 class WindowInfoDisplay(QWidget):
     """
     窗口信息显示组件 - 独立的UI显示
@@ -213,20 +230,27 @@ class WindowInfoDisplay(QWidget):
         self.setAttribute(Qt.WA_TranslucentBackground)
         self.setAttribute(Qt.WA_ShowWithoutActivating)
 
-        self.setFixedWidth(380)
+        self.setFixedWidth(450)
         self.setMinimumHeight(80)
         self.move(50, 50)
 
         # 主布局
         layout = QVBoxLayout()
         layout.setContentsMargins(15, 10, 15, 10)
-        layout.setSpacing(5)
+        layout.setSpacing(8)
 
-        # 第一行：进程名称、PID、窗口大小
-        self.line1Label = QLabel("-  |  -  |  -")
-        self.line1Label.setFont(QFont("Microsoft YaHei", 9, QFont.Bold))
-        self.line1Label.setStyleSheet("color: #E0E0E0; background: transparent;")
-        self.line1Label.setAlignment(Qt.AlignLeft)
+        # 第一行：进程名称、PID、窗口大小 - 三个独立标签
+        self.tagProcess = InfoTag("-")
+        self.tagPid = InfoTag("-")
+        self.tagSize = InfoTag("-")
+        
+        h1 = QHBoxLayout()
+        h1.setContentsMargins(0, 0, 0, 0)
+        h1.setSpacing(8)
+        h1.addWidget(self.tagProcess)
+        h1.addWidget(self.tagPid)
+        h1.addWidget(self.tagSize)
+        h1.addStretch()
 
         # 第二行：图标 + 窗口标题
         self.iconLabel = QLabel()
@@ -235,7 +259,7 @@ class WindowInfoDisplay(QWidget):
         self.iconLabel.setAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
         self.line2Label = QLabel("-")
-        self.line2Label.setFont(QFont("Microsoft YaHei", 9))
+        self.line2Label.setFont(QFont("Microsoft YaHei", 9, QFont.Bold))
         self.line2Label.setStyleSheet("color: #C0C0C0; background: transparent;")
         self.line2Label.setAlignment(Qt.AlignLeft)
         self.line2Label.setWordWrap(True)
@@ -246,7 +270,7 @@ class WindowInfoDisplay(QWidget):
         h2.addWidget(self.iconLabel)
         h2.addWidget(self.line2Label)
 
-        layout.addWidget(self.line1Label)
+        layout.addLayout(h1)
         layout.addLayout(h2)
         self.setLayout(layout)
 
@@ -273,7 +297,9 @@ class WindowInfoDisplay(QWidget):
         else:
             self.updateTimer.stop()
             # 显示禁用状态
-            self.line1Label.setText("⏸ 已禁用  |  -  |  -")
+            self.tagProcess.setText("⏸")
+            self.tagPid.setText("禁用")
+            self.tagSize.setText("-")
             self.line2Label.setText("窗口信息显示已禁用")
             self.iconLabel.setPixmap(QPixmap())
             self.iconLabel.setText("⏸")
@@ -298,9 +324,9 @@ class WindowInfoDisplay(QWidget):
         """获取当前显示的信息"""
         return {
             'title': self.line2Label.text(),
-            'process_name': self.line1Label.text().split('|')[0].strip() if '|' in self.line1Label.text() else '-',
-            'pid': self.line1Label.text().split('|')[1].strip() if '|' in self.line1Label.text() else '-',
-            'size': self.line1Label.text().split('|')[2].strip() if '|' in self.line1Label.text() else '-'
+            'process_name': self.tagProcess.text(),
+            'pid': self.tagPid.text(),
+            'size': self.tagSize.text()
         }
 
     def updateInfo(self):
@@ -311,8 +337,10 @@ class WindowInfoDisplay(QWidget):
         info = self.core.get_foreground_info()
         
         if info['hwnd']:
-            # 第一行：进程名 | PID | 窗口大小
-            self.line1Label.setText(f"{info['process_name']}  |  {info['pid']}  |  {info['size']}")
+            # 第一行：三个独立标签
+            self.tagProcess.setText(info['process_name'])
+            self.tagPid.setText(str(info['pid']))
+            self.tagSize.setText(info['size'])
             
             # 第二行：窗口标题
             self.line2Label.setText(info['title'])
@@ -320,7 +348,9 @@ class WindowInfoDisplay(QWidget):
             # 设置图标
             self._set_icon(info['icon_type'])
         else:
-            self.line1Label.setText("-  |  -  |  -")
+            self.tagProcess.setText("-")
+            self.tagPid.setText("-")
+            self.tagSize.setText("-")
             self.line2Label.setText("-")
 
     def _set_icon(self, icon_type):
@@ -337,18 +367,48 @@ class WindowInfoDisplay(QWidget):
             self.iconLabel.setText(icon_chars.get(icon_type, '💻'))
 
     def paintEvent(self, event):
-        """绘制背景"""
+        """绘制背景 - 左侧白色边框，去除左上和左下圆角"""
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
-        # 背景：半透明深色
+        
+        # 获取窗口矩形
+        rect = self.rect()
+        
+        # 创建路径：左侧边框为白色，左上和左下为直角
+        path = QPainterPath()
+        
+        # 圆角半径
+        radius = 10
+        
+        # 从左上角开始（直角）
+        path.moveTo(0, 0)
+        
+        # 顶部边：从左上角到右上角（右上圆角）
+        path.lineTo(rect.width() - radius, 0)
+        path.arcTo(rect.width() - radius * 2, 0, radius * 2, radius * 2, 90, -90)
+        
+        # 右边：从右上到右下（右下圆角）
+        path.lineTo(rect.width(), rect.height() - radius)
+        path.arcTo(rect.width() - radius * 2, rect.height() - radius * 2, radius * 2, radius * 2, 0, -90)
+        
+        # 底部边：从右下到左下（左下直角）
+        path.lineTo(0, rect.height())
+        
+        # 左边：从左下到左上（直角，无圆角）
+        path.closeSubpath()
+        
+        # 填充背景
         painter.setBrush(QBrush(QColor(30, 30, 30, 200)))
-        # 边框：3px 半透明灰色
-        pen = QPen(QColor(160, 160, 160, 50))
-        pen.setWidth(3)
-        painter.setPen(pen)
-        # 将绘制区域内缩半个边框宽度以避免裁剪
-        r = self.rect().adjusted(1, 1, -1, -1)
-        painter.drawRoundedRect(r, 10, 10)
+        painter.setPen(Qt.NoPen)
+        painter.drawPath(path)
+        
+        # 绘制左侧白色边框（仅左侧）
+        painter.setPen(QPen(QColor(255, 255, 255, 220), 8))
+        painter.setBrush(Qt.NoBrush)
+        
+        # 只绘制左边框（从顶部到底部）
+        painter.drawLine(0, 0, 0, rect.height())
+        
         super().paintEvent(event)
 
     def mousePressEvent(self, event):

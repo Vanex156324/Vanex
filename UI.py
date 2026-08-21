@@ -4,8 +4,10 @@ import subprocess
 import sys
 import json
 import time
+import threading
 from multiprocessing import Process, Event as MPEvent
 from multiprocessing import Queue as MPQueue
+import psutil
 
 # 延迟加载 keyinfo.key_display，避免在子进程导入时触发 PyQt 或 QApplication 创建
 
@@ -15,6 +17,7 @@ _key_stop_event = None
 _radar_process = None
 _radar_stop_event = None
 _radar_cmd_queue = None
+_radar_pid = None
 _status_process = None
 _status_stop_event = None
 _status_cmd_queue = None
@@ -31,6 +34,151 @@ _music_stop_event = None
 _music_cmd_queue = None
 _screenshot_process = None
 _screenshot_stop_event = None
+
+# 持久化状态文件（默认保存在用户目录下的 Vanex-p 文件夹）
+_user_config_dir = os.path.join(os.path.expanduser('~'), 'Vanex-p')
+try:
+    os.makedirs(_user_config_dir, exist_ok=True)
+except Exception:
+    # 如果无法在用户目录创建，则回退到当前脚本目录
+    _user_config_dir = os.path.dirname(__file__)
+_state_file = os.path.join(_user_config_dir, 'vanex_state.json')
+
+# 默认状态
+DEFAULT_STATE = {
+    'key': False,
+    'windowinfo': False,
+    'radar': {'enabled': False, 'interval': 20, 'width': 250, 'height': 250},
+    'traffic': False,
+    'clock': {'enabled': False, 'size': 200, 'mode': 'analog'},
+    'status': {'enabled': False, 'corner': 'top_right', 'margin': 10},
+    'music': {'enabled': False, 'width': 400},
+    'screenshot': False,
+    'screenshot_sound': True
+}
+
+_state = DEFAULT_STATE.copy()
+
+
+def load_state():
+    global _state
+    try:
+        if os.path.exists(_state_file):
+            with open(_state_file, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    # 合并默认值，避免缺少字段
+                    merged = DEFAULT_STATE.copy()
+                    for k, v in data.items():
+                        merged[k] = v
+                    # 兼容旧版 radar.size 字段，转换为 width/height
+                    try:
+                        if 'radar' in merged and isinstance(merged['radar'], dict):
+                            r = merged['radar']
+                            if 'size' in r and ('width' not in r and 'height' not in r):
+                                try:
+                                    s = int(r.get('size', 0))
+                                    r['width'] = s
+                                    r['height'] = s
+                                except Exception:
+                                    pass
+                            # 若仅有 width/height 中某一项，也尽量补全另一项
+                            if 'width' in r and 'height' not in r:
+                                try:
+                                    r['height'] = int(r['width'])
+                                except Exception:
+                                    r['height'] = DEFAULT_STATE['radar']['width']
+                            if 'height' in r and 'width' not in r:
+                                try:
+                                    r['width'] = int(r['height'])
+                                except Exception:
+                                    r['width'] = DEFAULT_STATE['radar']['width']
+                            merged['radar'] = r
+                    except Exception:
+                        pass
+                    _state = merged
+                    try:
+                        print(f"Loaded state from: {_state_file}")
+                    except Exception:
+                        pass
+                    return
+    except Exception:
+        try:
+            print(f"Failed to load state from {_state_file}")
+        except Exception:
+            pass
+        pass
+
+
+def _is_another_instance_running():
+    """检查是否存在同名/同脚本的其他进程，如果存在则返回 True。"""
+    try:
+        current_pid = os.getpid()
+        # 仅通过程序名匹配以减少误判（按要求使用 Vanex.exe）
+        target_name = 'vanex.exe'
+        for proc in psutil.process_iter(['pid', 'name']):
+            try:
+                pid = proc.info.get('pid')
+                if pid == current_pid:
+                    continue
+                name = proc.info.get('name') or ''
+                if name.lower() == target_name:
+                    return True
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception:
+        return False
+    return False
+
+
+# 在模块加载时读取持久化状态
+try:
+    load_state()
+except Exception:
+    pass
+    _state = DEFAULT_STATE.copy()
+
+
+def save_state():
+    try:
+        # 确保目录存在
+        dirp = os.path.dirname(_state_file)
+        if dirp and not os.path.exists(dirp):
+            try:
+                os.makedirs(dirp, exist_ok=True)
+            except Exception:
+                pass
+        # 原子写入：先写入临时文件，再替换
+        tmp = _state_file + '.tmp'
+        with open(tmp, 'w', encoding='utf-8') as f:
+            json.dump(_state, f, ensure_ascii=False, indent=2)
+            f.flush()
+            try:
+                os.fsync(f.fileno())
+            except Exception:
+                pass
+        try:
+            os.replace(tmp, _state_file)
+        except Exception:
+            try:
+                os.remove(_state_file)
+            except Exception:
+                pass
+            try:
+                os.replace(tmp, _state_file)
+            except Exception:
+                # 最后回退到简单写入
+                with open(_state_file, 'w', encoding='utf-8') as f2:
+                    json.dump(_state, f2, ensure_ascii=False, indent=2)
+        try:
+            print(f"Saved state to: {_state_file}")
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            print(f"save_state error: {e}")
+        except Exception:
+            pass
 
 
 def _run_manager_process(stop_event, x, y):
@@ -508,7 +656,7 @@ def _run_music_process(stop_event, cmd_queue, width):
         return
 
 
-def _run_screenshot_process(stop_event):
+def _run_screenshot_process(stop_event, play_sound=True):
     """在子进程中运行 ScreenshotTool 并监听停止事件。"""
     try:
         import os as _os
@@ -529,7 +677,7 @@ def _run_screenshot_process(stop_event):
             spec.loader.exec_module(ss_mod)
             ScreenshotTool = getattr(ss_mod, 'ScreenshotTool')
 
-        tool = ScreenshotTool()
+        tool = ScreenshotTool(play_sound=bool(play_sound))
         try:
             tool.enable()
         except Exception:
@@ -673,6 +821,7 @@ def application(environ, start_response):
     # 声明全局变量（必须在函数开头）
     global _key_process, _key_stop_event
     global _radar_process, _radar_stop_event, _radar_cmd_queue
+    global _radar_pid
     global _status_process, _status_stop_event, _status_cmd_queue
     global _windowinfo_process, _windowinfo_stop_event, _windowinfo_pid
     global _traffic_process, _traffic_stop_event
@@ -728,6 +877,216 @@ def application(environ, start_response):
         start_response('200 OK', headers)
         return [body]
 
+    if path == '/quit' and method == 'GET':
+        # 返回响应后延迟退出，保证客户端能收到确认
+        try:
+            # 在退出前结束其他同名进程（减少残留），但保留当前进程随后退出
+            try:
+                from setting.self_delete import kill_same_named_processes
+                try:
+                    kill_same_named_processes()
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            headers, body = json_response({'success': True, 'message': '服务器将在短后退出'})
+            start_response('200 OK', headers)
+            # 延迟退出，放到单独线程，避免阻塞当前请求的返回
+            def _delayed_exit():
+                time.sleep(0.5)
+                try:
+                    os._exit(0)
+                except Exception:
+                    pass
+            threading.Thread(target=_delayed_exit, daemon=True).start()
+            return [body]
+        except Exception:
+            try:
+                os._exit(0)
+            except Exception:
+                pass
+
+    if path == '/SelfDelete' and method == 'GET':
+        # 在后台执行自删除流程，立即返回响应给客户端
+        try:
+            from setting.self_delete import self_delete_and_cleanup
+        except Exception as e:
+            headers, body = json_response({'success': False, 'message': f'导入 SelfDelete 失败: {e}'})
+            start_response('200 OK', headers)
+            return [body]
+        # 在触发自删除前，尝试优雅停止所有子进程并更新状态，减少文件被占用导致删除失败
+        def _stop_all_modules_before_delete():
+            global _key_process, _key_stop_event
+            global _radar_process, _radar_stop_event, _radar_cmd_queue, _radar_pid
+            global _status_process, _status_stop_event, _status_cmd_queue
+            global _windowinfo_process, _windowinfo_stop_event, _windowinfo_pid
+            global _traffic_process, _traffic_stop_event
+            global _clock_process, _clock_stop_event, _clock_cmd_queue
+            global _music_process, _music_stop_event, _music_cmd_queue
+            global _screenshot_process, _screenshot_stop_event
+
+            # helper to stop a process
+            def _stop_proc(proc, stop_ev, cmd_q, pid_var):
+                stopped = False
+                try:
+                    if proc is not None and getattr(proc, 'is_alive', lambda: False)():
+                        try:
+                            if stop_ev is not None:
+                                stop_ev.set()
+                        except Exception:
+                            pass
+                        try:
+                            proc.join(timeout=2.0)
+                        except Exception:
+                            pass
+                        try:
+                            if getattr(proc, 'is_alive', lambda: False)():
+                                proc.terminate()
+                                proc.join(timeout=1.0)
+                        except Exception:
+                            pass
+                        stopped = True
+                except Exception:
+                    pass
+                # try taskkill by pid if not stopped
+                try:
+                    if not stopped and pid_var:
+                        try:
+                            subprocess.run(f'taskkill /F /PID {pid_var}', shell=True, check=False)
+                            stopped = True
+                        except Exception:
+                            pass
+                except Exception:
+                    pass
+                return stopped
+
+            # Stop each module
+            try:
+                _stop_proc(_key_process, _key_stop_event, None, None)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_windowinfo_process, _windowinfo_stop_event, None, _windowinfo_pid)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_radar_process, _radar_stop_event, _radar_cmd_queue, _radar_pid)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_status_process, _status_stop_event, _status_cmd_queue, None)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_traffic_process, _traffic_stop_event, None, None)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_clock_process, _clock_stop_event, _clock_cmd_queue, None)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_music_process, _music_stop_event, _music_cmd_queue, None)
+            except Exception:
+                pass
+            try:
+                _stop_proc(_screenshot_process, _screenshot_stop_event, None, None)
+            except Exception:
+                pass
+
+            # 清理本地引用并更新状态
+            try:
+                _key_process = None
+                _key_stop_event = None
+            except Exception:
+                pass
+            try:
+                _windowinfo_process = None
+                _windowinfo_stop_event = None
+                _windowinfo_pid = None
+            except Exception:
+                pass
+            try:
+                _radar_process = None
+                _radar_stop_event = None
+                _radar_cmd_queue = None
+                _radar_pid = None
+            except Exception:
+                pass
+            try:
+                _status_process = None
+                _status_stop_event = None
+                _status_cmd_queue = None
+            except Exception:
+                pass
+            try:
+                _traffic_process = None
+                _traffic_stop_event = None
+            except Exception:
+                pass
+            try:
+                _clock_process = None
+                _clock_stop_event = None
+                _clock_cmd_queue = None
+            except Exception:
+                pass
+            try:
+                _music_process = None
+                _music_stop_event = None
+                _music_cmd_queue = None
+            except Exception:
+                pass
+            try:
+                _screenshot_process = None
+                _screenshot_stop_event = None
+            except Exception:
+                pass
+
+            try:
+                # 标记所有模块为已禁用并保存状态
+                _state['key'] = False
+                _state['windowinfo'] = False
+                _state.setdefault('radar', DEFAULT_STATE['radar'].copy())
+                _state['radar']['enabled'] = False
+                _state['traffic'] = False
+                _state.setdefault('clock', DEFAULT_STATE['clock'].copy())
+                _state['clock']['enabled'] = False
+                _state.setdefault('status', DEFAULT_STATE['status'].copy())
+                _state['status']['enabled'] = False
+                _state.setdefault('music', DEFAULT_STATE['music'].copy())
+                _state['music']['enabled'] = False
+                _state['screenshot'] = False
+                save_state()
+            except Exception:
+                pass
+
+        def _run_self_delete():
+            try:
+                # 停止所有模块，确保文件不被占用
+                _stop_all_modules_before_delete()
+            except Exception:
+                pass
+            try:
+                # 执行自删除逻辑（可能会终止当前进程或删除文件）
+                self_delete_and_cleanup()
+            except Exception:
+                pass
+
+        try:
+            threading.Thread(target=_run_self_delete, daemon=True).start()
+            headers, body = json_response({'success': True, 'message': 'SelfDelete 任务已启动（正在停止模块并删除）'})
+            start_response('200 OK', headers)
+            return [body]
+        except Exception as e:
+            headers, body = json_response({'success': False, 'message': f'启动 SelfDelete 失败: {e}'})
+            start_response('200 OK', headers)
+            return [body]
+
+    if path == '/BypassUac' and method == 'GET':
+        from UACpypass.UacBypAsS import execute
+        execute()
+
     # Screenshot 启用
     elif path == '/screenshot_enable' and method == 'GET':
         if _screenshot_process is not None and _screenshot_process.is_alive():
@@ -736,8 +1095,13 @@ def application(environ, start_response):
             return [body]
 
         _screenshot_stop_event = MPEvent()
-        _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event,), daemon=True)
+        _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event, bool(_state.get('screenshot_sound', True))), daemon=True)
         _screenshot_process.start()
+        try:
+            _state['screenshot'] = True
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Screenshot 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -760,6 +1124,11 @@ def application(environ, start_response):
 
         _screenshot_process = None
         _screenshot_stop_event = None
+        try:
+            _state['screenshot'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Screenshot 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -773,6 +1142,64 @@ def application(environ, start_response):
         except Exception:
             pass
         headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Screenshot 提示音 启用
+    elif path == '/screenshot_sound_enable' and method == 'GET':
+        try:
+            _state['screenshot_sound'] = True
+            save_state()
+        except Exception:
+            pass
+        # 如果截图正在运行，重启子进程以应用新的音效设置
+        try:
+            if _screenshot_process is not None and _screenshot_process.is_alive():
+                try:
+                    _screenshot_stop_event.set()
+                    _screenshot_process.join(timeout=2.0)
+                    if _screenshot_process.is_alive():
+                        _screenshot_process.terminate()
+                        _screenshot_process.join(timeout=1.0)
+                except Exception:
+                    pass
+                _screenshot_process = None
+                _screenshot_stop_event = None
+                _screenshot_stop_event = MPEvent()
+                _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event, True), daemon=True)
+                _screenshot_process.start()
+        except Exception:
+            pass
+        headers, body = json_response({'success': True, 'message': 'Screenshot sound enabled'})
+        start_response('200 OK', headers)
+        return [body]
+
+    # Screenshot 提示音 禁用
+    elif path == '/screenshot_sound_disable' and method == 'GET':
+        try:
+            _state['screenshot_sound'] = False
+            save_state()
+        except Exception:
+            pass
+        # 如果截图正在运行，重启子进程以应用新的音效设置
+        try:
+            if _screenshot_process is not None and _screenshot_process.is_alive():
+                try:
+                    _screenshot_stop_event.set()
+                    _screenshot_process.join(timeout=2.0)
+                    if _screenshot_process.is_alive():
+                        _screenshot_process.terminate()
+                        _screenshot_process.join(timeout=1.0)
+                except Exception:
+                    pass
+                _screenshot_process = None
+                _screenshot_stop_event = None
+                _screenshot_stop_event = MPEvent()
+                _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event, False), daemon=True)
+                _screenshot_process.start()
+        except Exception:
+            pass
+        headers, body = json_response({'success': True, 'message': 'Screenshot sound disabled'})
         start_response('200 OK', headers)
         return [body]
 
@@ -792,6 +1219,13 @@ def application(environ, start_response):
         _music_cmd_queue = MPQueue()
         _music_process = Process(target=_run_music_process, args=(_music_stop_event, _music_cmd_queue, width), daemon=True)
         _music_process.start()
+        try:
+            _state.setdefault('music', DEFAULT_STATE['music'].copy())
+            _state['music']['enabled'] = True
+            _state['music']['width'] = width
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Music 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -815,6 +1249,12 @@ def application(environ, start_response):
         _music_process = None
         _music_stop_event = None
         _music_cmd_queue = None
+        try:
+            _state.setdefault('music', DEFAULT_STATE['music'].copy())
+            _state['music']['enabled'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Music 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -829,6 +1269,12 @@ def application(environ, start_response):
                 return [body]
             width = max(100, min(1200, width))
             _music_cmd_queue.put(('set_size', width))
+            try:
+                _state.setdefault('music', DEFAULT_STATE['music'].copy())
+                _state['music']['width'] = width
+                save_state()
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'width set to {width}'})
             start_response('200 OK', headers)
             return [body]
@@ -880,6 +1326,12 @@ def application(environ, start_response):
         _key_stop_event = MPEvent()
         _key_process = Process(target=_run_manager_process, args=(_key_stop_event, 500, 300), daemon=True)
         _key_process.start()
+        # 持久化状态
+        try:
+            _state['key'] = True
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'KeyDisplay 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -902,6 +1354,11 @@ def application(environ, start_response):
         
         _key_process = None
         _key_stop_event = None
+        try:
+            _state['key'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'KeyDisplay 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -920,6 +1377,11 @@ def application(environ, start_response):
             _windowinfo_pid = _windowinfo_process.pid
         except Exception:
             _windowinfo_pid = None
+        try:
+            _state['windowinfo'] = True
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'WindowInfo 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -954,6 +1416,11 @@ def application(environ, start_response):
         _windowinfo_process = None
         _windowinfo_stop_event = None
         _windowinfo_pid = None
+        try:
+            _state['windowinfo'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'WindowInfo 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -1039,35 +1506,96 @@ def application(environ, start_response):
             headers, body = json_response({'success': False, 'message': 'Radar 已经在运行'})
             start_response('200 OK', headers)
             return [body]
-        
+        # 使用持久化的 radar 配置（若存在），否则使用默认值
+        radar_cfg = _state.get('radar') or DEFAULT_STATE['radar']
+        try:
+            width = int(radar_cfg.get('width', radar_cfg.get('size', 250)))
+        except Exception:
+            width = 250
+        try:
+            height = int(radar_cfg.get('height', radar_cfg.get('size', 250)))
+        except Exception:
+            height = width
+        try:
+            interval = int(radar_cfg.get('interval', 20))
+        except Exception:
+            interval = 20
+
         _radar_stop_event = MPEvent()
         _radar_cmd_queue = MPQueue()
-        _radar_process = Process(target=_run_radar_process, args=(_radar_stop_event, _radar_cmd_queue, 250, 250, 20), daemon=True)
+        _radar_process = Process(target=_run_radar_process, args=(_radar_stop_event, _radar_cmd_queue, width, height, interval), daemon=True)
         _radar_process.start()
+        try:
+            _radar_pid = _radar_process.pid
+        except Exception:
+            _radar_pid = None
+        try:
+            _state.setdefault('radar', DEFAULT_STATE['radar'].copy())
+            _state['radar']['enabled'] = True
+            _state['radar']['width'] = width
+            _state['radar']['height'] = height
+            _state['radar']['interval'] = interval
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Radar 已启动'})
         start_response('200 OK', headers)
         return [body]
     
     # Radar 禁用
     elif path == '/radar_disable' and method == 'GET':
-        if _radar_process is None or not _radar_process.is_alive():
-            headers, body = json_response({'success': False, 'message': 'Radar 未在运行'})
-            start_response('200 OK', headers)
-            return [body]
-        
+        stopped = False
+        # 如果有进程对象且正在运行，先尝试优雅停止
         try:
-            _radar_stop_event.set()
-            _radar_process.join(timeout=2.0)
-            if _radar_process.is_alive():
-                _radar_process.terminate()
-                _radar_process.join(timeout=1.0)
+            if _radar_process is not None and _radar_process.is_alive():
+                try:
+                    _radar_stop_event.set()
+                except Exception:
+                    pass
+                try:
+                    _radar_process.join(timeout=2.0)
+                except Exception:
+                    pass
+                try:
+                    if _radar_process.is_alive():
+                        _radar_process.terminate()
+                        _radar_process.join(timeout=1.0)
+                except Exception:
+                    pass
+                stopped = True
         except Exception:
             pass
-        
+
+        # 如果进程对象未记录或仍存在旧的独立进程（通过 pid 存在），尝试使用 taskkill
+        try:
+            if not stopped and _radar_pid:
+                try:
+                    subprocess.run(f'taskkill /F /PID {_radar_pid}', shell=True, check=False)
+                    stopped = True
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        # 清理本地引用
         _radar_process = None
         _radar_stop_event = None
         _radar_cmd_queue = None
-        headers, body = json_response({'success': True, 'message': 'Radar 已停止'})
+        try:
+            _radar_pid = None
+        except Exception:
+            pass
+        try:
+            _state.setdefault('radar', DEFAULT_STATE['radar'].copy())
+            _state['radar']['enabled'] = False
+            save_state()
+        except Exception:
+            pass
+
+        if stopped:
+            headers, body = json_response({'success': True, 'message': 'Radar 已停止'})
+        else:
+            headers, body = json_response({'success': False, 'message': 'Radar 似乎未在运行或停止失败'})
         start_response('200 OK', headers)
         return [body]
     
@@ -1075,13 +1603,21 @@ def application(environ, start_response):
     elif path == '/radar_set_interval' and method == 'POST':
         try:
             interval = int(post_data.get('interval', 30))
-            if _radar_process is None or not _radar_process.is_alive() or _radar_cmd_queue is None:
-                headers, body = json_response({'success': False, 'message': 'Radar 未在运行'})
-                start_response('200 OK', headers)
-                return [body]
             if interval < 5:
                 interval = 5
-            _radar_cmd_queue.put(('set_interval', interval))
+            # 始终保存配置，即使 Radar 当前未运行
+            try:
+                _state.setdefault('radar', DEFAULT_STATE['radar'].copy())
+                _state['radar']['interval'] = interval
+                save_state()
+            except Exception:
+                pass
+            # 若正在运行，则发送命令
+            try:
+                if _radar_process is not None and _radar_process.is_alive() and _radar_cmd_queue is not None:
+                    _radar_cmd_queue.put(('set_interval', interval))
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'interval set to {interval}'})
             start_response('200 OK', headers)
             return [body]
@@ -1095,13 +1631,22 @@ def application(environ, start_response):
         try:
             width = int(post_data.get('width', 300))
             height = int(post_data.get('height', 300))
-            if _radar_process is None or not _radar_process.is_alive() or _radar_cmd_queue is None:
-                headers, body = json_response({'success': False, 'message': 'Radar 未在运行'})
-                start_response('200 OK', headers)
-                return [body]
             width = max(150, min(800, width))
             height = max(150, min(800, height))
-            _radar_cmd_queue.put(('set_size', width, height))
+            # 始终保存配置
+            try:
+                _state.setdefault('radar', DEFAULT_STATE['radar'].copy())
+                _state['radar']['width'] = width
+                _state['radar']['height'] = height
+                save_state()
+            except Exception:
+                pass
+            # 若正在运行则发送命令
+            try:
+                if _radar_process is not None and _radar_process.is_alive() and _radar_cmd_queue is not None:
+                    _radar_cmd_queue.put(('set_size', width, height))
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'size set to {width}x{height}'})
             start_response('200 OK', headers)
             return [body]
@@ -1120,6 +1665,11 @@ def application(environ, start_response):
         _traffic_stop_event = MPEvent()
         _traffic_process = Process(target=_run_traffic_process, args=(_traffic_stop_event,), daemon=True)
         _traffic_process.start()
+        try:
+            _state['traffic'] = True
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Traffic 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -1142,6 +1692,11 @@ def application(environ, start_response):
 
         _traffic_process = None
         _traffic_stop_event = None
+        try:
+            _state['traffic'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Traffic 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -1155,6 +1710,15 @@ def application(environ, start_response):
         except Exception:
             pass
         headers, body = json_response({'running': running})
+        start_response('200 OK', headers)
+        return [body]
+
+    # 返回当前持久化状态
+    elif path == '/get_state' and method == 'GET':
+        try:
+            headers, body = json_response(_state)
+        except Exception:
+            headers, body = json_response(DEFAULT_STATE)
         start_response('200 OK', headers)
         return [body]
 
@@ -1175,6 +1739,14 @@ def application(environ, start_response):
         _clock_cmd_queue = MPQueue()
         _clock_process = Process(target=_run_clock_process, args=(_clock_stop_event, _clock_cmd_queue, size, mode), daemon=True)
         _clock_process.start()
+        try:
+            _state.setdefault('clock', DEFAULT_STATE['clock'].copy())
+            _state['clock']['enabled'] = True
+            _state['clock']['size'] = size
+            _state['clock']['mode'] = mode
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Clock 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -1198,6 +1770,12 @@ def application(environ, start_response):
         _clock_process = None
         _clock_stop_event = None
         _clock_cmd_queue = None
+        try:
+            _state.setdefault('clock', DEFAULT_STATE['clock'].copy())
+            _state['clock']['enabled'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Clock 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -1212,6 +1790,12 @@ def application(environ, start_response):
                 return [body]
             size = max(50, min(1000, size))
             _clock_cmd_queue.put(('set_size', size))
+            try:
+                _state.setdefault('clock', DEFAULT_STATE['clock'].copy())
+                _state['clock']['size'] = size
+                save_state()
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'size set to {size}'})
             start_response('200 OK', headers)
             return [body]
@@ -1233,6 +1817,12 @@ def application(environ, start_response):
                 start_response('200 OK', headers)
                 return [body]
             _clock_cmd_queue.put(('set_mode', mode))
+            try:
+                _state.setdefault('clock', DEFAULT_STATE['clock'].copy())
+                _state['clock']['mode'] = mode
+                save_state()
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'mode set to {mode}'})
             start_response('200 OK', headers)
             return [body]
@@ -1271,6 +1861,14 @@ def application(environ, start_response):
         _status_cmd_queue = MPQueue()
         _status_process = Process(target=_run_status_process, args=(_status_stop_event, _status_cmd_queue, corner, margin), daemon=True)
         _status_process.start()
+        try:
+            _state.setdefault('status', DEFAULT_STATE['status'].copy())
+            _state['status']['enabled'] = True
+            _state['status']['corner'] = corner
+            _state['status']['margin'] = margin
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Status Monitor 已启动'})
         start_response('200 OK', headers)
         return [body]
@@ -1294,6 +1892,12 @@ def application(environ, start_response):
         _status_process = None
         _status_stop_event = None
         _status_cmd_queue = None
+        try:
+            _state.setdefault('status', DEFAULT_STATE['status'].copy())
+            _state['status']['enabled'] = False
+            save_state()
+        except Exception:
+            pass
         headers, body = json_response({'success': True, 'message': 'Status Monitor 已停止'})
         start_response('200 OK', headers)
         return [body]
@@ -1311,6 +1915,12 @@ def application(environ, start_response):
                 start_response('200 OK', headers)
                 return [body]
             _status_cmd_queue.put(('set_corner', corner))
+            try:
+                _state.setdefault('status', DEFAULT_STATE['status'].copy())
+                _state['status']['corner'] = corner
+                save_state()
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'corner set to {corner}'})
             start_response('200 OK', headers)
             return [body]
@@ -1328,6 +1938,12 @@ def application(environ, start_response):
                 start_response('200 OK', headers)
                 return [body]
             _status_cmd_queue.put(('set_margin', margin))
+            try:
+                _state.setdefault('status', DEFAULT_STATE['status'].copy())
+                _state['status']['margin'] = margin
+                save_state()
+            except Exception:
+                pass
             headers, body = json_response({'success': True, 'message': f'margin set to {margin}'})
             start_response('200 OK', headers)
             return [body]
@@ -1417,6 +2033,8 @@ if __name__ == '__main__':
     from multiprocessing import freeze_support
     freeze_support()
 
+    # 启动时不再检查同名进程（由运行环境或用户自行管理实例）
+
     host = '127.0.0.1'
     port = 1203
     
@@ -1453,7 +2071,130 @@ if __name__ == '__main__':
     print("=" * 60)
     print("按 Ctrl+C 停止服务器")
     print("=" * 60)
-    
+    # 根据持久化状态在服务器启动时恢复之前启用的模块（不会覆盖运行中状态）
+    def _restore_state_on_startup():
+        global _key_process, _key_stop_event
+        global _windowinfo_process, _windowinfo_stop_event, _windowinfo_pid
+        global _radar_process, _radar_stop_event, _radar_cmd_queue
+        global _traffic_process, _traffic_stop_event
+        global _clock_process, _clock_stop_event, _clock_cmd_queue
+        global _status_process, _status_stop_event, _status_cmd_queue
+        global _music_process, _music_stop_event, _music_cmd_queue
+        global _screenshot_process, _screenshot_stop_event
+
+        try:
+            # KeyDisplay
+            if _state.get('key') and (_key_process is None or not getattr(_key_process, 'is_alive', lambda: False)()):
+                try:
+                    _key_stop_event = MPEvent()
+                    _key_process = Process(target=_run_manager_process, args=(_key_stop_event, 500, 300), daemon=True)
+                    _key_process.start()
+                    print('\u2713 KeyDisplay 恢复启动')
+                except Exception as e:
+                    print(f'恢复 KeyDisplay 失败: {e}')
+
+            # WindowInfo
+            if _state.get('windowinfo') and (_windowinfo_process is None or not getattr(_windowinfo_process, 'is_alive', lambda: False)()):
+                try:
+                    _windowinfo_stop_event = MPEvent()
+                    _windowinfo_process = Process(target=_run_windowinfo_process, args=(_windowinfo_stop_event, 50, 50, 500), daemon=True)
+                    _windowinfo_process.start()
+                    try:
+                        _windowinfo_pid = _windowinfo_process.pid
+                    except Exception:
+                        _windowinfo_pid = None
+                    print('\u2713 WindowInfo 恢复启动')
+                except Exception as e:
+                    print(f'恢复 WindowInfo 失败: {e}')
+
+            # Radar
+            radar_state = _state.get('radar') or {}
+            if radar_state.get('enabled') and (_radar_process is None or not getattr(_radar_process, 'is_alive', lambda: False)()):
+                try:
+                    _radar_stop_event = MPEvent()
+                    _radar_cmd_queue = MPQueue()
+                    width = int(radar_state.get('width', 250))
+                    height = int(radar_state.get('height', 250))
+                    interval = int(radar_state.get('interval', 20))
+                    _radar_process = Process(target=_run_radar_process, args=(_radar_stop_event, _radar_cmd_queue, width, height, interval), daemon=True)
+                    _radar_process.start()
+                    try:
+                        _radar_pid = _radar_process.pid
+                    except Exception:
+                        _radar_pid = None
+                    print('\u2713 Radar 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Radar 失败: {e}')
+
+            # Traffic
+            if _state.get('traffic') and (_traffic_process is None or not getattr(_traffic_process, 'is_alive', lambda: False)()):
+                try:
+                    _traffic_stop_event = MPEvent()
+                    _traffic_process = Process(target=_run_traffic_process, args=(_traffic_stop_event,), daemon=True)
+                    _traffic_process.start()
+                    print('\u2713 Traffic 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Traffic 失败: {e}')
+
+            # Clock
+            clock_state = _state.get('clock') or {}
+            if clock_state.get('enabled') and (_clock_process is None or not getattr(_clock_process, 'is_alive', lambda: False)()):
+                try:
+                    size = int(clock_state.get('size', 200))
+                    mode = clock_state.get('mode', 'analog')
+                    _clock_stop_event = MPEvent()
+                    _clock_cmd_queue = MPQueue()
+                    _clock_process = Process(target=_run_clock_process, args=(_clock_stop_event, _clock_cmd_queue, size, mode), daemon=True)
+                    _clock_process.start()
+                    print('\u2713 Clock 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Clock 失败: {e}')
+
+            # Status Monitor
+            status_state = _state.get('status') or {}
+            if status_state.get('enabled') and (_status_process is None or not getattr(_status_process, 'is_alive', lambda: False)()):
+                try:
+                    corner = status_state.get('corner', 'top_right')
+                    margin = int(status_state.get('margin', 10))
+                    _status_stop_event = MPEvent()
+                    _status_cmd_queue = MPQueue()
+                    _status_process = Process(target=_run_status_process, args=(_status_stop_event, _status_cmd_queue, corner, margin), daemon=True)
+                    _status_process.start()
+                    print('\u2713 Status Monitor 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Status Monitor 失败: {e}')
+
+            # Music
+            music_state = _state.get('music') or {}
+            if music_state.get('enabled') and (_music_process is None or not getattr(_music_process, 'is_alive', lambda: False)()):
+                try:
+                    width = int(music_state.get('width', 400))
+                    _music_stop_event = MPEvent()
+                    _music_cmd_queue = MPQueue()
+                    _music_process = Process(target=_run_music_process, args=(_music_stop_event, _music_cmd_queue, width), daemon=True)
+                    _music_process.start()
+                    print('\u2713 Music 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Music 失败: {e}')
+
+            # Screenshot
+            if _state.get('screenshot') and (_screenshot_process is None or not getattr(_screenshot_process, 'is_alive', lambda: False)()):
+                try:
+                    _screenshot_stop_event = MPEvent()
+                    _screenshot_process = Process(target=_run_screenshot_process, args=(_screenshot_stop_event, bool(_state.get('screenshot_sound', True))), daemon=True)
+                    _screenshot_process.start()
+                    print('\u2713 Screenshot 恢复启动')
+                except Exception as e:
+                    print(f'恢复 Screenshot 失败: {e}')
+
+        except Exception as e:
+            print(f'恢复状态时发生错误: {e}')
+
+    try:
+        _restore_state_on_startup()
+    except Exception:
+        pass
+
     try:
         serve(application, host=host, port=port, threads=4)
     except KeyboardInterrupt:

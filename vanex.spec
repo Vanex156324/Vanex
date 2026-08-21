@@ -10,7 +10,8 @@ a = Analysis(
     ('windows_info', 'windows_info/'),
     ('traffic', 'traffic/'),
     ('music', 'music/'),
-    ('Screenshot', 'Screenshot/')
+    ('Screenshot', 'Screenshot/'),
+    ('keyinfo', 'keyinfo/')
     ],
     hiddenimports=[
     ],
@@ -42,4 +43,5 @@ exe = EXE(
     target_arch=None,
     codesign_identity=None,
     entitlements_file=None,
+    icon='appicon.ico',
 )

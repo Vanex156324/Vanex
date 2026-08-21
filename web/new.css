@@ -49,3 +49,34 @@
     margin-left: 12px;
     padding: 8px;
 }
+.p2pMessages {
+    flex: 1;
+    overflow-y: auto;
+    background: #1e1e1e;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    min-height: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    height:230px;
+    width:90%;
+    margin-left:12px;
+}
+    /* 隐藏轨道，只显示滑块 */
+    .p2pMessages::-webkit-scrollbar {
+        width: 6px;
+    }
+
+    .p2pMessages::-webkit-scrollbar-track {
+        background: transparent; /* 完全透明，不显示轨道 */
+    }
+
+    .p2pMessages::-webkit-scrollbar-thumb {
+        background: #2b2b2b;
+        border-radius: 10px;
+    }
+
+        .p2pMessages::-webkit-scrollbar-thumb:hover {
+            background: #808080;
+        }

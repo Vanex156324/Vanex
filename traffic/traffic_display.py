@@ -189,7 +189,7 @@ class TrafficWidget(QWidget):
         
         # 绘制半透明深色背景
         painter.setBrush(QColor(30, 30, 30, 200))
-        painter.setPen(QPen(QColor(180, 180, 180, 100), 2))
+        painter.setPen(Qt.NoPen)  # 关键：移除边框画笔
         
         # 绘制圆角矩形
         painter.drawRoundedRect(rect.adjusted(1, 1, -1, -1), 10, 10)

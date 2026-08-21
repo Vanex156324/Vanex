@@ -16,7 +16,6 @@
 """
 
 import sys
-import math
 import os
 import win32gui
 import win32process
@@ -32,71 +31,6 @@ user32 = ctypes.windll.user32
 # 全局应用实例
 _app = None
 _tracker_instance = None
-
-
-class WaveWidget(QWidget):
-    """海浪波动动画组件"""
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setFixedSize(400, 35)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        
-        # 动画参数
-        self.wave_offset = 0
-        self.wave_speed = 2
-        self.amplitude = 5
-        self.wave_length = 0.5
-        
-        # 启动动画
-        self.timer = QTimer()
-        self.timer.timeout.connect(self.update_wave)
-        self.timer.start(30)
-        
-    def update_wave(self):
-        self.wave_offset += self.wave_speed
-        self.update()
-    
-    def paintEvent(self, event):
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-        
-        width = self.width()
-        height = self.height()
-        center_y = height - 8
-        
-        # 创建波浪路径
-        path = QPainterPath()
-        path.moveTo(0, height)
-        
-        for x in range(width + 1):
-            y = center_y - self.amplitude * math.sin(
-                (x + self.wave_offset) * self.wave_length * 0.1
-            )
-            path.lineTo(x, y)
-        
-        path.lineTo(width, height)
-        path.closeSubpath()
-        
-        painter.setBrush(QColor(200, 200, 200, 50))
-        painter.setPen(Qt.NoPen)
-        painter.drawPath(path)
-        
-        # 第二条波浪
-        path2 = QPainterPath()
-        path2.moveTo(0, height)
-        
-        for x in range(width + 1):
-            y = center_y - (self.amplitude * 1.6) * math.sin(
-                (x + self.wave_offset * 1.3 + 50) * self.wave_length * 0.1
-            )
-            path2.lineTo(x, y)
-        
-        path2.lineTo(width, height)
-        path2.closeSubpath()
-        
-        painter.setBrush(QColor(180, 180, 180, 30))
-        painter.setPen(Qt.NoPen)
-        painter.drawPath(path2)
 
 
 class CloudMusicTracker(QWidget):
@@ -127,25 +61,27 @@ class CloudMusicTracker(QWidget):
         
         self.setAttribute(Qt.WA_TranslucentBackground)
         
-        # 设置窗口大小和位置
-        self.setFixedSize(400, 195)
-        self.move(QApplication.primaryScreen().geometry().width() - 420, 
-                  QApplication.primaryScreen().geometry().height() - 215)
+        # 设置窗口内容大小（最终大小可能受窗口框架影响，实际调整在 showEvent 中完成）
+        self._desired_width = 400
+        self._desired_height = 165
+        self.resize(self._desired_width, self._desired_height)
+        # 标记是否已经定位过，避免重复调整
+        self._positioned = False
         
         # 设置等线字体
         font = QFont("等线", 13)
         font.setBold(True)
         self.setFont(font)
         
-        # 样式
+        # 样式 - 添加了左下角和右下角圆角
         self.setStyleSheet("""
             QWidget#main_widget {
                 background-color: rgba(30, 30, 30, 200);
                 border: none;
                 border-top-left-radius: 12px;
                 border-top-right-radius: 12px;
-                border-bottom-left-radius: 0px;
-                border-bottom-right-radius: 0px;
+                border-bottom-left-radius: 12px;
+                border-bottom-right-radius: 12px;
             }
             QLabel#song_label {
                 font-size: 20px;
@@ -199,7 +135,7 @@ class CloudMusicTracker(QWidget):
         # 控制按钮
         control_layout = QHBoxLayout()
         control_layout.setSpacing(20)
-        control_layout.setContentsMargins(20, 5, 20, 5)
+        control_layout.setContentsMargins(20, 5, 20, 15)  # 底部边距增加
         
         # 加载图标
         self.load_icons()
@@ -233,10 +169,6 @@ class CloudMusicTracker(QWidget):
         
         layout.addLayout(control_layout)
         
-        # 海浪动画
-        self.wave_widget = WaveWidget()
-        layout.addWidget(self.wave_widget, alignment=Qt.AlignBottom)
-        
         # 设置主布局
         main_layout = QVBoxLayout(self)
         main_layout.setContentsMargins(10, 10, 10, 10)
@@ -246,6 +178,44 @@ class CloudMusicTracker(QWidget):
         self.drag_pos = None
         self.mousePressEvent = self.mouse_press_event
         self.mouseMoveEvent = self.mouse_move_event
+
+    def showEvent(self, event):
+        """首次显示时调整实际窗口大小以兼容系统窗口框架并放置到屏幕右下角。"""
+        super().showEvent(event)
+        try:
+            if getattr(self, '_positioned', False):
+                return
+            # 计算窗口框架与客户区差值
+            fg = self.frameGeometry()
+            geo = self.geometry()
+            hdiff = max(0, fg.height() - geo.height())
+            wdiff = max(0, fg.width() - geo.width())
+
+            new_w = self._desired_width + wdiff
+            new_h = self._desired_height + hdiff
+
+            # 应用新的大小：使用 resize + minimum 限制，避免 setFixedSize 导致拖动时的几何冲突警告
+            try:
+                self.resize(new_w, new_h)
+            except Exception:
+                pass
+            try:
+                self.setMinimumSize(new_w, new_h)
+            except Exception:
+                pass
+
+            # 位置：保留原始逻辑的右下偏移 20px
+            screen = QApplication.primaryScreen().geometry()
+            x = screen.width() - (new_w + 20)
+            y = screen.height() - (new_h + 20)
+            try:
+                self.move(x, y)
+            except Exception:
+                pass
+
+            self._positioned = True
+        except Exception:
+            pass
     
     def load_icons(self):
         """加载图标"""
@@ -398,7 +368,6 @@ class CloudMusicTracker(QWidget):
                     self.song_label.setText('未检测到网易云音乐')
                     self.song_label.setStyleSheet("color: #666666; font-size: 20px; font-weight: bold;")
                     self.artist_label.setText('')
-                    self.wave_widget.timer.stop()
                 self.current_song = ""
                 return
             
@@ -408,7 +377,6 @@ class CloudMusicTracker(QWidget):
                 self.song_label.setText('窗口已隐藏')
                 self.song_label.setStyleSheet("color: #666666; font-size: 20px; font-weight: bold;")
                 self.artist_label.setText('')
-                self.wave_widget.timer.stop()
                 return
             
             song_name, artist = self.parse_song_info(window_title)
@@ -427,14 +395,10 @@ class CloudMusicTracker(QWidget):
                 self.current_song = song_key
                 self.animate_update()
                 self.song_changed.emit(song_name, artist)
-                
-                if not self.wave_widget.timer.isActive():
-                    self.wave_widget.timer.start(30)
                     
         except Exception as e:
             self.song_label.setText('检测出错')
             self.artist_label.setText('')
-            self.wave_widget.timer.stop()
     
     def animate_update(self):
         self.song_label.setStyleSheet("color: #AAAAAA; font-size: 20px; font-weight: bold;")
@@ -444,7 +408,6 @@ class CloudMusicTracker(QWidget):
         """停止跟踪器"""
         self._stopped = True
         self.timer.stop()
-        self.wave_widget.timer.stop()
         self.close()
     
     def set_position(self, x, y):

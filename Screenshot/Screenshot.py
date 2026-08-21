@@ -10,7 +10,7 @@ import threading
 class ScreenshotTool:
     """截屏工具类，可被外部应用调用"""
     
-    def __init__(self, save_dir=None, sound_file="Screenshot.mp3", hotkey=keyboard.Key.print_screen):
+    def __init__(self, save_dir=None, sound_file="Screenshot.mp3", hotkey=keyboard.Key.print_screen, play_sound=True):
         """
         初始化截屏工具
         
@@ -20,14 +20,22 @@ class ScreenshotTool:
             hotkey: 快捷键，默认 PrintScreen
         """
         self.save_dir = save_dir or os.path.join(os.path.expanduser("~"), "Vanex-p")
-        self.sound_file = self._find_sound(sound_file)
+        # 如果不播放音效，则不加载音效文件
+        self.sound_file = None
+        if play_sound:
+            self.sound_file = self._find_sound(sound_file)
         self.hotkey = hotkey
         self.enabled = False
         self.listener = None
         self._listener_thread = None
         
-        # 初始化音效
-        pygame.mixer.init()
+        # 初始化音效（仅当需要播放音效时初始化）
+        if self.sound_file:
+            try:
+                pygame.mixer.init()
+            except Exception:
+                # 忽略音效初始化失败
+                self.sound_file = None
         
         # 确保目录存在
         os.makedirs(self.save_dir, exist_ok=True)
